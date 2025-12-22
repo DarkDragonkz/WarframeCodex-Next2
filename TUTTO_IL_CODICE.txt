@@ -1,0 +1,1706 @@
+DATA DUMP: 2025-12-21T22:13:29.384Z
+
+
+
+==================================================
+FILE: src\app\amps\page.js
+==================================================
+
+// src/app/amps/page.js
+import CodexListPage from '@/components/CodexListPage';
+import { fetchGameData } from '@/utils/serverData';
+
+export default async function Page() {
+    // Gli Amp sono spesso in Secondary.json o Misc.json. 
+    // Li cerchiamo e filtriamo.
+    const secondary = await fetchGameData('Secondary.json');
+    const misc = await fetchGameData('Misc.json');
+    
+    const allItems = [...secondary, ...misc];
+    
+    // Filtro manuale per trovare gli Amp
+    const amps = allItems.filter(i => 
+        (i.type && i.type.toLowerCase().includes('amp')) || 
+        (i.name && i.name.toLowerCase().includes(' amp')) ||
+        (i.uniqueName && i.uniqueName.includes('OPERATOR_AMPLIFIER'))
+    );
+
+    return <CodexListPage initialData={amps} pageTitle="AMPS" />;
+}
+
+==================================================
+FILE: src\app\api\relics\lookup\route.js
+==================================================
+
+// src/app/api/relics/lookup/route.js
+import { NextResponse } from 'next/server';
+import { fetchRelicsDB } from '@/utils/serverData';
+
+export async function POST(request) {
+    try {
+        // Riceve una lista di nomi: ["Lith G1", "Meso N5"]
+        const { names } = await request.json();
+        
+        if (!names || !Array.isArray(names) || names.length === 0) {
+            return NextResponse.json([]);
+        }
+
+        const allRelics = await fetchRelicsDB();
+        
+        // Filtra solo quelle richieste
+        const found = allRelics.filter(r => {
+            // Pulizia nome reliquia nel DB per confronto
+            const dbName = r.name.replace(' (Intact)', '').replace(' Relic', '').trim();
+            return names.includes(dbName);
+        }).map(r => ({
+             name: r.name.replace(' (Intact)', '').replace(' Relic', '').trim(),
+             drops: r.drops || [],
+             vaulted: !r.drops || r.drops.length === 0
+        }));
+
+        return NextResponse.json(found);
+    } catch (e) {
+        return NextResponse.json({ error: e.message }, { status: 500 });
+    }
+}
+
+==================================================
+FILE: src\app\api\sync-db\route.js
+==================================================
+
+// src/app/api/sync-db/route.js
+import { NextResponse } from 'next/server';
+import { fetchGameData } from '@/utils/serverData';
+
+const ALL_FILES = [
+    'Warframes.json', 'Primary.json', 'Secondary.json', 'Melee.json', 
+    'Mods.json', 'Relics.json', 'Arcanes.json', 'Archwing.json', 
+    'Arch-Gun.json', 'Arch-Melee.json', 'Sentinels.json', 
+    'SentinelWeapons.json', 'Pets.json', 'Enemy.json', 'Fish.json', 
+    'Gear.json', 'Glyphs.json', 'Misc.json', 'Node.json', 'Quests.json', 
+    'Resources.json', 'Sigils.json', 'Skins.json'
+];
+
+export async function GET() {
+    const results = {};
+    console.log("Starting FORCED Database Sync...");
+
+    await Promise.all(ALL_FILES.map(async (file) => {
+        try {
+            // true = Forza il download sovrascrivendo i file vecchi
+            const data = await fetchGameData(file, true);
+            results[file] = data.length > 0 ? `OK (${data.length})` : 'EMPTY';
+        } catch (error) {
+            results[file] = 'ERROR';
+        }
+    }));
+
+    return NextResponse.json({ 
+        message: "Database Update Complete", 
+        folder: process.cwd() + '/database_api',
+        details: results 
+    });
+}
+
+==================================================
+FILE: src\app\companions\page.js
+==================================================
+
+import CodexListPage from '@/components/CodexListPage';
+import { fetchGameData } from '@/utils/serverData';
+
+export default async function Page() {
+    // Scarica Sentinelle e Animali (Pet)
+    const [sentinels, pets] = await Promise.all([
+        fetchGameData('Sentinels.json'),
+        fetchGameData('Pets.json')
+    ]);
+    
+    // Unisci i dati in un'unica lista
+    const data = [...sentinels, ...pets];
+
+    return (
+        <CodexListPage 
+            initialData={data} 
+            pageTitle="COMPANIONS" 
+            categoryMode="companions" 
+        />
+    );
+}
+
+==================================================
+FILE: src\app\error.js
+==================================================
+
+// src/app/error.js
+"use client";
+
+export default function Error({ error, reset }) {
+  return (
+    <div style={{padding: '50px', color: 'white', textAlign: 'center'}}>
+      <h2 style={{color: '#ff6b6b'}}>SYSTEM FAILURE</h2>
+      <p>Ordis has encountered an error:</p>
+      <pre style={{background: '#222', padding: '20px', borderRadius: '5px', display:'inline-block', textAlign:'left'}}>
+        {error.message}
+      </pre>
+      <br />
+      <button 
+        onClick={() => reset()} 
+        style={{marginTop: '20px', padding: '10px 20px', background: '#d4af37', border: 'none', cursor: 'pointer', fontWeight:'bold'}}
+      >
+        REBOOT SYSTEM
+      </button>
+    </div>
+  );
+}
+
+==================================================
+FILE: src\app\globals.css
+==================================================
+
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Roboto+Condensed:wght@300;400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-deep: #050505;
+  --bg-panel: #0f0f11;
+  --gold: #c5a059; /* Oro Warframe più realistico, meno giallo */
+  --gold-glow: rgba(197, 160, 89, 0.25);
+  --blue-energy: #4da6ff;
+  --blue-glow: rgba(77, 166, 255, 0.2);
+  --text-dim: #8b8b95;
+}
+
+body {
+  background-color: var(--bg-deep);
+  color: #ededed;
+  font-family: 'Rajdhani', sans-serif;
+  overflow: hidden;
+  
+  /* TEXTURE SFONDO: Griglia Sottile "Blueprint" */
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Scrollbar Futuristica */
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: #0a0a0a; }
+.custom-scrollbar::-webkit-scrollbar-thumb { 
+  background: #333; 
+  border-radius: 0; /* Squadrato è più tech */
+  border: 1px solid #000;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--gold); }
+
+/* Utility Text Shadow per leggibilità */
+.text-shadow-sm { text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+.text-glow-gold { text-shadow: 0 0 10px rgba(197, 160, 89, 0.6); }
+
+==================================================
+FILE: src\app\layout.js
+==================================================
+
+// src/app/layout.js
+import './globals.css';
+
+export const metadata = {
+  title: 'Warframe Codex',
+  description: 'Tracker',
+}
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body className="bg-black text-white">{children}</body>
+    </html>
+  )
+}
+
+==================================================
+FILE: src\app\melee\page.js
+==================================================
+
+import CodexListPage from '@/components/CodexListPage';
+import { fetchGameData } from '@/utils/serverData';
+
+export default async function Page() {
+    const data = await fetchGameData('Melee.json');
+    return <CodexListPage initialData={data} pageTitle="MELEE WEAPONS" />;
+}
+
+==================================================
+FILE: src\app\modal.css
+==================================================
+
+/* =========================================
+   STILE FINESTRA MODALE (WARFRAME DETAIL)
+   ========================================= */
+
+.modal-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+
+.modal-content.three-columns {
+  width: 95vw;
+  height: 90vh;
+  max-width: 1600px;
+  display: flex;
+  flex-direction: row; /* Layout Orizzontale a 3 Colonne */
+  background: #141418;
+  border: 1px solid #444;
+  border-top: 3px solid var(--gold);
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 0 50px rgba(0,0,0,1);
+}
+
+.close-btn {
+  position: absolute; top: 5px; right: 10px; background: none;
+  border: none; color: #fff; font-size: 30px; cursor: pointer; z-index: 20;
+}
+.close-btn:hover { color: var(--gold); }
+
+/* --- COLONNE COMUNI --- */
+.column-info, .column-relics, .column-strategy {
+  display: flex; flex-direction: column; height: 100%;
+  border-right: 2px solid #2a2a2e;
+  overflow: hidden;
+}
+
+/* --- COLONNA 1: INFO (25%) --- */
+.column-info { flex: 0 0 25%; min-width: 300px; background: #101012; padding: 20px; }
+
+.det-title { font-size: 24px; color: #fff; margin: 0; text-transform: uppercase; }
+.det-subtitle { color: var(--gold); font-size: 12px; margin-bottom: 20px; }
+.det-img-box { flex-grow: 1; display: flex; align-items: center; justify-content: center; }
+.det-img-box img { max-width: 100%; max-height: 250px; filter: drop-shadow(0 0 10px #000); }
+.det-desc { font-size: 12px; color: #888; overflow-y: auto; max-height: 150px; margin-bottom: 20px; line-height: 1.5; }
+
+/* Mini lista posseduti */
+.mini-owned-list { background: #1a1a1e; padding: 10px; border-radius: 4px; border: 1px solid #333; }
+.mini-own-item { font-size: 11px; color: #888; margin-bottom: 4px; border-bottom: 1px solid #222; padding-bottom: 2px; }
+.mini-own-item.ok { color: #2ecc71; font-weight: bold; }
+.mini-own-item b { float: right; }
+
+/* --- COLONNA 2: RELIQUIE (35%) --- */
+.column-relics { flex: 0 0 35%; background: #0e0e10; }
+
+.col-header {
+  padding: 15px; background: #000; border-bottom: 1px solid #333;
+  font-size: 14px; font-weight: bold; color: #fff; letter-spacing: 1px;
+  text-transform: uppercase; text-align: center; border-left: 4px solid var(--gold);
+}
+
+.col-scrollable { padding: 15px; overflow-y: auto; flex-grow: 1; }
+.tier-grid { display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start; }
+
+.relic-sub-group { margin-bottom: 25px; border-bottom: 1px dashed #333; padding-bottom: 15px; }
+.relic-sub-group:last-child { border-bottom: none; }
+
+.relic-sub-group-title {
+  font-size: 11px; font-weight: 800; color: #fff; background: #222;
+  padding: 5px 10px; border-left: 3px solid var(--blue-energy); margin-bottom: 10px;
+  text-transform: uppercase; letter-spacing: 1px;
+}
+
+/* Card Reliquia */
+.relic-card-item {
+  width: 90px; height: 100px;
+  background: #1a1a1e; border: 1px solid #333; border-radius: 4px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  position: relative; cursor: pointer; transition: transform 0.1s;
+  flex-shrink: 0;
+}
+.relic-card-item:hover { transform: translateY(-2px); background: #222; }
+.relic-card-item.active { border-color: var(--gold); box-shadow: 0 0 8px rgba(212,175,55,0.3); z-index: 5; }
+.relic-card-item.vaulted { border-top: 3px solid #e55; }
+.relic-card-item.available { border-top: 3px solid #2ecc71; }
+
+.r-icon-area img { width: 40px; height: 40px; object-fit: contain; margin-bottom: 5px; }
+.r-name { font-size: 10px; font-weight: bold; color: #fff; text-align: center; }
+.r-status { font-size: 7px; opacity: 0.8; margin-bottom: 4px; }
+.r-check {
+  position: absolute; top: 2px; right: 2px; background: var(--gold); color: #000;
+  width: 14px; height: 14px; font-size: 9px; display: flex; align-items: center;
+  justify-content: center; border-radius: 50%;
+}
+
+/* Badge e Rarità */
+.rarity-bar { position: absolute; bottom: 0; left: 0; width: 100%; height: 4px; }
+.bar-bronze { background: #cd7f32; box-shadow: 0 0 5px #cd7f32; }
+.bar-silver { background: #c0c0c0; box-shadow: 0 0 5px #c0c0c0; }
+.bar-gold   { background: #d4af37; box-shadow: 0 0 8px #d4af37; }
+
+.relic-chance-badge {
+  position: absolute; top: 4px; right: 4px; left: auto; color: #000;
+  font-size: 8px; font-weight: 800; padding: 1px 4px; border-radius: 2px;
+  z-index: 10; box-shadow: 0 2px 4px rgba(0,0,0,0.8);
+}
+
+/* --- COLONNA 3: STRATEGIA (40% - Restante) --- */
+.column-strategy { flex: 1; background: #111; border-right: none; }
+
+.strategy-list { display: flex; flex-direction: column; gap: 10px; }
+
+.mission-card { background: #1a1a1e; border: 1px solid #333; border-radius: 4px; overflow: hidden; }
+
+.mc-header {
+  background: #222; padding: 8px 10px; border-bottom: 1px solid #333;
+  display: flex; justify-content: space-between; align-items: center;
+}
+
+.mc-loc { color: #fff; font-weight: bold; font-size: 13px; }
+.mc-rot-badge { color: var(--gold); font-weight: 800; margin-left: 5px; text-transform: uppercase; }
+.mc-type { color: #aaa; font-size: 11px; text-transform: uppercase; font-weight: bold; }
+
+/* Lista Testo Strategia */
+.mc-relics-list { padding: 8px 12px; }
+
+.mc-text-row {
+  font-size: 12px; margin-bottom: 4px; border-bottom: 1px solid #252525;
+  padding-bottom: 2px; color: #ccc; display: flex; align-items: center;
+}
+.mc-text-row:last-child { border-bottom: none; }
+
+.mt-comp { color: #888; font-weight: bold; margin-right: 5px; min-width: 70px; }
+.mt-relic { color: #fff; font-weight: bold; }
+.mt-rot { color: var(--gold); font-weight: bold; margin-left: 5px; }
+.mt-chance { color: var(--blue-energy); margin-left: auto; font-weight: bold; }
+
+/* Stati vuoti */
+.empty-state-placeholder, .col-loading, .col-empty, .strategy-placeholder, .strategy-empty {
+  padding: 30px; text-align: center; color: #666; font-size: 12px;
+  display: flex; align-items: center; justify-content: center; height: 100%; font-style: italic;
+}
+/* src/app/modal.css */
+
+/* MODALE GENERALE */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(10px); z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.modal-content.three-columns {
+  width: 95vw; height: 90vh; max-width: 1600px;
+  display: flex; background: #121214;
+  border: 1px solid #333; border-top: 3px solid var(--gold);
+  position: relative; box-shadow: 0 0 50px #000;
+}
+
+.close-btn {
+  position: absolute; top: 15px; right: 20px; font-size: 28px;
+  color: #fff; background: none; border: none; cursor: pointer; z-index: 50;
+}
+.close-btn:hover { color: var(--gold); }
+
+/* LAYOUT COLONNE */
+.column-info { flex: 0 0 25%; background: #0a0a0c; padding: 30px; border-right: 1px solid #333; display: flex; flex-direction: column; }
+.column-components { flex: 0 0 40%; background: #121214; padding: 0; border-right: 1px solid #333; display: flex; flex-direction: column; overflow: hidden; }
+.column-strategy { flex: 1; background: #0e0e10; padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+
+/* COL 1: INFO */
+.det-title { font-size: 36px; font-weight: 900; color: #fff; margin: 0; text-transform: uppercase; line-height: 1; }
+.det-subtitle { color: var(--gold); font-size: 14px; font-weight: bold; margin-bottom: 30px; text-transform: uppercase; letter-spacing: 1px; }
+.det-img-box { flex: 1; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; }
+.det-img-box img { width: 100%; max-height: 400px; object-fit: contain; filter: drop-shadow(0 0 30px rgba(0,0,0,0.5)); }
+.det-desc { font-size: 13px; color: #888; line-height: 1.6; max-height: 200px; overflow-y: auto; padding-right: 10px; }
+
+/* COL 2: COMPONENTI */
+.col-header { padding: 20px; font-size: 14px; font-weight: 800; color: #fff; background: #1a1a1e; border-bottom: 1px solid #333; letter-spacing: 1px; display: flex; justify-content: space-between; align-items: center; }
+.col-scrollable { flex: 1; overflow-y: auto; padding: 20px; }
+
+.component-block { margin-bottom: 25px; background: #18181b; border: 1px solid #27272a; border-radius: 8px; padding: 15px; }
+.comp-name { font-size: 14px; font-weight: bold; color: #fff; margin-bottom: 10px; text-transform: uppercase; border-left: 3px solid var(--blue-energy); padding-left: 10px; display: flex; justify-content: space-between; }
+.comp-owned { font-size: 10px; color: #666; }
+.comp-owned.yes { color: #2ecc71; }
+
+.relic-chips-container { display: flex; flex-wrap: wrap; gap: 8px; }
+.relic-chip {
+  background: #222; border: 1px solid #444; padding: 6px 12px;
+  border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px;
+  transition: all 0.2s; position: relative;
+}
+.relic-chip:hover { border-color: #fff; background: #333; }
+.relic-chip.selected { background: var(--gold); border-color: var(--gold); color: #000; box-shadow: 0 0 10px rgba(212,175,55,0.4); }
+.relic-chip.vaulted { opacity: 0.6; border-style: dashed; }
+
+.rc-name { font-size: 12px; font-weight: 800; }
+.rc-rarity { width: 6px; height: 6px; border-radius: 50%; }
+.rarity-Common { background: #cd7f32; }
+.rarity-Uncommon { background: #c0c0c0; }
+.rarity-Rare { background: #d4af37; }
+
+/* COL 3: STRATEGIA */
+.strategy-list { display: flex; flex-direction: column; gap: 10px; }
+.strategy-placeholder { padding: 40px; text-align: center; color: #555; font-style: italic; font-size: 13px; }
+
+.mission-row {
+  display: flex; justify-content: space-between; align-items: center;
+  background: #1a1a1e; border: 1px solid #333; padding: 10px 15px; border-radius: 4px;
+}
+.ms-loc { font-weight: bold; color: #fff; font-size: 13px; }
+.ms-relic { color: var(--gold); font-size: 11px; font-weight: bold; margin-left: 10px; }
+.ms-chance { color: var(--blue-energy); font-weight: bold; font-size: 12px; }
+
+.vault-warning {
+  background: rgba(231, 76, 60, 0.1); border: 1px solid #e74c3c; color: #e74c3c;
+  padding: 15px; text-align: center; font-weight: bold; border-radius: 4px; margin-bottom: 10px;
+}
+
+/* src/app/modal.css */
+
+/* SFONDO E CONTENITORE PRINCIPALE */
+.modal-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0, 0, 0, 0.9); backdrop-filter: blur(5px);
+  z-index: 1000; display: flex; align-items: center; justify-content: center;
+}
+
+.modal-content.three-columns {
+  width: 95vw; height: 90vh; max-width: 1600px;
+  background: #121214; border: 1px solid #333; border-top: 3px solid var(--gold);
+  display: flex; flex-direction: row; /* FONDAMENTALE: ORIZZONTALE */
+  overflow: hidden; position: relative; box-shadow: 0 0 50px #000;
+}
+
+.close-btn {
+  position: absolute; top: 10px; right: 20px; font-size: 30px;
+  color: #fff; background: none; border: none; cursor: pointer; z-index: 100;
+}
+.close-btn:hover { color: var(--gold); }
+
+/* DEFINIZIONE COLONNE */
+.column-info { 
+  flex: 0 0 25%; /* Larghezza fissa 25% */
+  background: #0a0a0c; border-right: 1px solid #333; 
+  display: flex; flex-direction: column; padding: 30px;
+}
+
+.column-components { 
+  flex: 0 0 40%; /* Larghezza fissa 40% */
+  background: #121214; border-right: 1px solid #333; 
+  display: flex; flex-direction: column; 
+}
+
+.column-strategy { 
+  flex: 1; /* Il resto dello spazio */
+  background: #0e0e10; 
+  display: flex; flex-direction: column; 
+}
+
+/* STILI INTERNI */
+.det-title { font-size: 32px; font-weight: 900; color: #fff; margin: 0; text-transform: uppercase; }
+.det-subtitle { color: var(--gold); font-size: 14px; font-weight: bold; margin-bottom: 20px; }
+.det-img-box { flex: 1; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; }
+.det-img-box img { width: 100%; max-height: 400px; object-fit: contain; filter: drop-shadow(0 0 20px rgba(0,0,0,0.5)); }
+.det-desc { font-size: 13px; color: #888; line-height: 1.5; overflow-y: auto; max-height: 200px; }
+
+/* HEADER E SCROLL AREA PER COLONNE 2 e 3 */
+.col-header { 
+  padding: 15px; background: #1a1a1e; border-bottom: 1px solid #333; 
+  font-size: 14px; font-weight: 800; color: #fff; letter-spacing: 1px; text-transform: uppercase;
+}
+.col-scrollable { flex: 1; overflow-y: auto; padding: 20px; }
+
+/* COMPONENTI */
+.component-block { margin-bottom: 20px; background: #18181b; border: 1px solid #27272a; border-radius: 6px; padding: 15px; }
+.comp-name { font-size: 14px; font-weight: bold; color: #fff; margin-bottom: 10px; display: flex; justify-content: space-between; border-left: 3px solid var(--blue-energy); padding-left: 10px; }
+.comp-owned { font-size: 10px; color: #666; font-weight: normal; }
+.comp-owned.yes { color: #2ecc71; font-weight: bold; }
+
+/* CHIPS RELIQUIE */
+.relic-chips-container { display: flex; flex-wrap: wrap; gap: 8px; }
+.relic-chip {
+  background: #222; border: 1px solid #444; padding: 5px 10px; border-radius: 4px;
+  cursor: pointer; display: flex; align-items: center; gap: 6px; transition: 0.2s;
+}
+.relic-chip:hover { border-color: #fff; background: #333; }
+.relic-chip.selected { background: var(--gold); border-color: var(--gold); color: #000; }
+.relic-chip.vaulted { opacity: 0.5; border-style: dashed; }
+
+.rc-name { font-size: 11px; font-weight: 700; }
+/* Pallini rarità */
+.rc-rarity { width: 6px; height: 6px; border-radius: 50%; }
+.rarity-Common { background: #cd7f32; box-shadow: 0 0 5px #cd7f32; }
+.rarity-Uncommon { background: #c0c0c0; box-shadow: 0 0 5px #c0c0c0; }
+.rarity-Rare { background: #d4af37; box-shadow: 0 0 5px #d4af37; }
+
+/* MISSIONI */
+.mission-row { 
+  display: flex; justify-content: space-between; align-items: center; 
+  padding: 8px 12px; background: #1a1a1e; border: 1px solid #333; 
+  border-radius: 4px; margin-bottom: 8px; 
+}
+.ms-loc { font-weight: bold; color: #fff; font-size: 12px; }
+.ms-relic { font-size: 10px; color: var(--gold); font-weight: bold; margin-bottom: 2px; }
+.ms-chance { font-size: 11px; color: var(--blue-energy); font-weight: bold; }
+.vault-warning { color: #e74c3c; border: 1px solid #e74c3c; padding: 10px; text-align: center; border-radius: 4px; font-weight: bold; font-size: 12px; margin-bottom: 15px; background: rgba(231,76,60,0.1); }
+.strategy-placeholder { text-align: center; padding: 40px; color: #555; font-style: italic; font-size: 13px; }
+
+==================================================
+FILE: src\app\mods\page.js
+==================================================
+
+import CodexListPage from '@/components/CodexListPage';
+import { fetchGameData } from '@/utils/serverData';
+
+export default async function Page() {
+    const data = await fetchGameData('Mods.json');
+    // Qui usiamo categoryMode="mods" per attivare i filtri speciali delle mod
+    return <CodexListPage initialData={data} pageTitle="MODS & ARCANES" categoryMode="mods" />;
+}
+
+==================================================
+FILE: src\app\necramechs\page.js
+==================================================
+
+import CodexListPage from '@/components/CodexListPage';
+import { fetchGameData } from '@/utils/serverData';
+
+export default async function Page() {
+    const data = await fetchGameData('Warframes.json'); // I mech sono qui dentro
+    return <CodexListPage initialData={data} pageTitle="NECRAMECHS" categoryMode="necramechs" />;
+}
+
+==================================================
+FILE: src\app\not-found.js
+==================================================
+
+// src/app/not-found.js
+import Link from 'next/link';
+
+export default function NotFound() {
+  return (
+    <div style={{
+      height: '100vh', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      alignItems: 'center', 
+      justifyContent: 'center', 
+      color: 'white', 
+      textAlign: 'center'
+    }}>
+      <h1 style={{fontSize: '40px', color: '#d4af37'}}>404 - ORDIS NOT FOUND</h1>
+      <p>Operator, this coordinates do not exist.</p>
+      <Link href="/" style={{marginTop:'20px', color:'#3b82f6', textDecoration:'underline'}}>
+        Return to Orbiter (Home)
+      </Link>
+    </div>
+  );
+}
+
+==================================================
+FILE: src\app\page.js
+==================================================
+
+// src/app/page.js
+"use client";
+import Link from 'next/link';
+import { useState } from 'react';
+
+const CATEGORIES = [
+    { id: 'warframes', title: 'Warframes', subtitle: 'The Arsenal', color: '#4da6ff', link: '/warframes', img: 'https://cdn.warframestat.us/img/excalibur-prime.png' },
+    { id: 'relics', title: 'Relics', subtitle: 'Void Traces', color: '#ffd700', link: '/relics', img: 'https://cdn.warframestat.us/img/lith-t1-relic.png' },
+    { id: 'necramechs', title: 'Necramechs', subtitle: 'Ancient Machines', color: '#a29bfe', link: '/necramechs', img: 'https://cdn.warframestat.us/img/voidrig.png' },
+    { id: 'primary', title: 'Primary', subtitle: 'Rifles & Bows', color: '#ff6b6b', link: '/primary', img: 'https://cdn.warframestat.us/img/soma-prime.png' },
+    { id: 'secondary', title: 'Secondary', subtitle: 'Pistols', color: '#ff9f43', link: '/secondary', img: 'https://cdn.warframestat.us/img/lex-prime.png' },
+    { id: 'melee', title: 'Melee', subtitle: 'Blades', color: '#feca57', link: '/melee', img: 'https://cdn.warframestat.us/img/orthos-prime.png' },
+    { id: 'companions', title: 'Companions', subtitle: 'Sentinels & Pets', color: '#54a0ff', link: '/companions', img: 'https://cdn.warframestat.us/img/carrier-prime.png' },
+    { id: 'amps', title: 'Amps', subtitle: 'Void Energy', color: '#00d2d3', link: '/amps', img: 'https://cdn.warframestat.us/img/mote-amp.png' },
+    { id: 'mods', title: 'Mods', subtitle: 'Upgrades', color: '#a29bfe', link: '/mods', img: 'https://cdn.warframestat.us/img/primed-continuity.png' }
+];
+
+export default function LandingPage() {
+    const [hovered, setHovered] = useState(null);
+
+    return (
+        <main className="min-h-screen w-full bg-[#050505] relative flex flex-col overflow-y-auto custom-scrollbar">
+            {/* Background Glow Effect */}
+            <div className="absolute top-[-20%] left-1/2 -translate-x-1/2 w-[80%] h-[60%] bg-[radial-gradient(circle,rgba(60,60,70,0.4)_0%,rgba(5,5,5,0)_70%)] pointer-events-none z-0"></div>
+            
+            <div className="relative z-10 pt-20 pb-16 flex flex-col items-center">
+                <div className="text-center mb-12">
+                    <h1 className="text-6xl font-black tracking-[10px] text-white m-0 leading-tight">
+                        ORDIS <span className="text-[#d4af37]">CODEX</span>
+                    </h1>
+                    <p className="text-sm text-gray-500 tracking-[6px] mt-2 uppercase">Database & Tracking</p>
+                    <div className="w-[60px] h-[3px] bg-[#d4af37] mx-auto mt-5"></div>
+                </div>
+
+                {/* Grid delle Card */}
+                <div className="flex flex-wrap justify-center gap-6 px-10 max-w-[1600px]">
+                    {CATEGORIES.map((cat) => (
+                        <Link href={cat.link} key={cat.id} className="block group">
+                            <div 
+                                className="w-[240px] h-[340px] bg-[#141418] border border-[#333] rounded-2xl overflow-hidden relative transition-all duration-300 ease-[cubic-bezier(0.25,0.8,0.25,1)] hover:-translate-y-3 hover:shadow-[0_20px_40px_rgba(0,0,0,0.6)] hover:border-gray-500 flex flex-col justify-end"
+                                onMouseEnter={() => setHovered(cat.id)}
+                                onMouseLeave={() => setHovered(null)}
+                                style={hovered === cat.id ? { borderColor: cat.color } : {}}
+                            >
+                                {/* Immagine Sfondo */}
+                                <div className="absolute top-0 left-0 w-full h-full z-0">
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent z-10 opacity-90"></div>
+                                    <img 
+                                        src={cat.img} 
+                                        alt={cat.title} 
+                                        className="w-full h-full object-cover filter grayscale brightness-50 transition-all duration-500 group-hover:grayscale-0 group-hover:brightness-100 group-hover:scale-110" 
+                                    />
+                                </div>
+                                
+                                {/* Contenuto Testuale */}
+                                <div className="relative z-20 p-6 text-center">
+                                    <h2 
+                                        className="text-2xl font-black uppercase m-0 transition-colors duration-300"
+                                        style={{ color: hovered === cat.id ? cat.color : '#fff' }}
+                                    >
+                                        {cat.title}
+                                    </h2>
+                                    <p className="text-[10px] text-[#aaa] tracking-[2px] mt-1.5 uppercase font-bold">
+                                        {cat.subtitle}
+                                    </p>
+                                </div>
+
+                                {/* Barra colorata in basso */}
+                                <div className="h-1 w-full z-20 relative" style={{ background: cat.color }}></div>
+                            </div>
+                        </Link>
+                    ))}
+                </div>
+            </div>
+
+            <footer className="text-center p-8 text-[#444] text-xs border-t border-[#111] mt-auto z-10 bg-[#050505]">
+                Fan-made Project • Data from Warframe-Items
+            </footer>
+        </main>
+    );
+}
+
+==================================================
+FILE: src\app\primary\page.js
+==================================================
+
+import CodexListPage from '@/components/CodexListPage';
+import { fetchGameData } from '@/utils/serverData';
+
+export default async function Page() {
+    const data = await fetchGameData('Primary.json');
+    return <CodexListPage initialData={data} pageTitle="PRIMARY WEAPONS" />;
+}
+
+==================================================
+FILE: src\app\relics\page.js
+==================================================
+
+// src/app/relics/page.js
+import CodexListPage from '@/components/CodexListPage';
+import { fetchGameData } from '@/utils/serverData';
+
+export default async function Page() {
+    // Scarica dati
+    const rawData = await fetchGameData('Relics.json');
+
+    // Se il file è vuoto o non scaricato, mostra un messaggio di errore invece di nero
+    if (!rawData || rawData.length === 0) {
+        return (
+            <div style={{padding:'50px', color:'#fff', textAlign:'center'}}>
+                <h1>Database Missing</h1>
+                <p>Please run the synchronization API to download Relics.</p>
+                <a href="/api/sync-db" style={{color:'yellow'}}>CLICK HERE TO SYNC</a>
+            </div>
+        );
+    }
+
+    // Pulizia
+    const cleanData = rawData
+        .filter(i => 
+            i.category === 'Relics' && 
+            !i.name.includes('(Radiant)') && 
+            !i.name.includes('(Flawless)') && 
+            !i.name.includes('(Exceptional)')
+        )
+        .map(i => ({
+            ...i,
+            name: i.name.replace(' (Intact)', '').replace(' Relic', '').trim(),
+            category: 'Relics'
+        }));
+
+    return (
+        <CodexListPage 
+            initialData={cleanData} 
+            pageTitle="RELIC ARCHIVE" 
+            categoryMode="relics" 
+        />
+    );
+}
+
+==================================================
+FILE: src\app\secondary\page.js
+==================================================
+
+import CodexListPage from '@/components/CodexListPage';
+import { fetchGameData } from '@/utils/serverData';
+
+export default async function Page() {
+    const data = await fetchGameData('Secondary.json');
+    return <CodexListPage initialData={data} pageTitle="SECONDARY WEAPONS" />;
+}
+
+==================================================
+FILE: src\app\warframes\page.js
+==================================================
+
+import CodexListPage from '@/components/CodexListPage';
+import { fetchGameData } from '@/utils/serverData';
+
+export default async function Page() {
+    // 1. Scarica e Salva in 'database_api/Warframes.json'
+    const data = await fetchGameData('Warframes.json');
+    // 2. Passa i dati alla lista
+    return <CodexListPage initialData={data} pageTitle="WARFRAMES" categoryMode="warframes" />;
+}
+
+==================================================
+FILE: src\components\CodexCard.js
+==================================================
+
+// src/components/CodexCard.js
+"use client";
+import { memo } from 'react';
+import { IMG_BASE_URL } from '@/utils/constants';
+
+const CodexCard = memo(function CodexCard({ item, isOwned, onToggleOwned }) {
+    
+    const wikiUrl = `https://warframe.fandom.com/wiki/${item.name.replace(/ /g, '_')}`;
+    const isPrime = item.name.includes("Prime");
+    
+    // Gestione Descrizione
+    let descriptionText = item.description || "No tactical data available.";
+    if (item.category === 'Mods' && item.levelStats?.length > 0) {
+        const lastStat = item.levelStats[item.levelStats.length - 1];
+        if (lastStat && lastStat.stats) descriptionText = lastStat.stats.join("<br>");
+    }
+    descriptionText = descriptionText.replace(/\r\n/g, " ").replace(/\n/g, " ");
+
+    return (
+        <div 
+            className={`
+                group relative flex flex-col h-[360px] rounded-sm overflow-hidden 
+                bg-[#0f0f11] transition-all duration-300 ease-out border
+                hover:-translate-y-1 hover:shadow-[0_10px_40px_rgba(0,0,0,0.5)]
+                ${isOwned 
+                    ? (isPrime ? 'border-[#c5a059]/40' : 'border-[#4da6ff]/40') // Posseduto: Bordo colorato tenue
+                    : 'border-[#333] hover:border-[#555]'} // Mancante: Grigio scuro
+            `}
+            onClick={(e) => { e.stopPropagation(); onToggleOwned(item.uniqueName); }} // Cliccare ovunque cambia stato (più comodo)
+            title="Click to toggle OWNED status"
+        >
+            {/* --- INDICATORE DI STATO (Barra Superiore) --- */}
+            <div className={`
+                absolute top-0 left-0 w-full h-[4px] z-30 transition-all duration-500
+                ${isOwned 
+                    ? (isPrime ? 'bg-[#c5a059] shadow-[0_0_15px_#c5a059]' : 'bg-[#4da6ff] shadow-[0_0_15px_#4da6ff]') 
+                    : 'bg-[#222]'}
+            `}></div>
+
+            {/* --- IMMAGINE --- */}
+            <div className="relative h-[180px] flex items-center justify-center p-4 overflow-hidden bg-[radial-gradient(circle_at_center,#1a1a20_0%,#0f0f11_100%)]">
+                {/* Indicatore "Mastered" Icon (Angolo alto destra) */}
+                <div className={`
+                    absolute top-3 right-3 z-20 transition-all duration-300 transform
+                    ${isOwned ? 'opacity-100 scale-100' : 'opacity-20 scale-90 grayscale'}
+                `}>
+                     {/* Icona "Gem" di Warframe stilizzata */}
+                     <svg width="24" height="24" viewBox="0 0 24 24" fill={isPrime ? '#c5a059' : '#4da6ff'}>
+                        <path d="M12 2L2 12l10 10 10-10L12 2zm0 16l-6-6 6-6 6 6-6 6z"/>
+                     </svg>
+                </div>
+
+                {item.imageName ? (
+                    <img 
+                        src={`${IMG_BASE_URL}/${item.imageName}`} 
+                        className={`
+                            max-w-full max-h-full object-contain drop-shadow-[0_5px_10px_rgba(0,0,0,0.8)] 
+                            transition-transform duration-500 group-hover:scale-110
+                            ${isOwned ? '' : 'opacity-70 grayscale-[0.5]'} 
+                        `} 
+                        loading="lazy" 
+                        alt={item.name} 
+                    />
+                ) : (
+                    <span className="text-xs text-gray-700 font-mono tracking-widest">NO VISUAL</span>
+                )}
+            </div>
+
+            {/* --- INFO PANEL --- */}
+            <div className="flex-1 flex flex-col p-4 relative border-t border-[#1a1a1e] bg-[#0f0f11]">
+                {/* Nome */}
+                <div className="mb-2 flex justify-between items-start">
+                    <h3 className={`text-md font-bold uppercase leading-tight tracking-wide ${isPrime ? 'text-[#c5a059]' : 'text-gray-200'}`}>
+                        {item.name}
+                    </h3>
+                </div>
+
+                {/* Descrizione con font più leggibile */}
+                <div className="relative flex-grow overflow-hidden mb-2">
+                    <div 
+                        className="text-[11px] text-[#8b8b95] font-[Roboto_Condensed] leading-snug line-clamp-3" 
+                        dangerouslySetInnerHTML={{__html: descriptionText}}
+                    ></div>
+                </div>
+
+                {/* Footer: Wiki & Status Text */}
+                <div className="mt-auto flex justify-between items-center pt-2 border-t border-[#1a1a1e]">
+                     <a 
+                        href={wikiUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-[10px] font-bold text-[#555] hover:text-white uppercase tracking-widest transition-colors"
+                    >
+                        Wiki Access
+                    </a>
+                    
+                    {isOwned && (
+                        <span className={`text-[9px] font-bold uppercase tracking-wider ${isPrime ? 'text-[#c5a059]' : 'text-[#4da6ff]'}`}>
+                            Acquired
+                        </span>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+});
+export default CodexCard;
+
+==================================================
+FILE: src\components\CodexListPage.js
+==================================================
+
+// src/components/CodexListPage.js
+"use client";
+import { useState, useMemo } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import CodexCard from './CodexCard';
+import WarframeDetailModal from './WarframeDetailModal';
+import { useOwnedItems } from '@/hooks/useOwnedItems';
+import { BASE_PATH } from '@/utils/constants';
+
+// Categorie (Invariato)
+const CATEGORIES = {
+    'warframes': [{ id: 'all', label: 'WARFRAMES', filter: (i) => i.category === 'Warframes' && i.productCategory === 'Suits' }],
+    'necramechs': [{ id: 'all', label: 'UNITS', filter: (i) => i.productCategory === 'Mech' }],
+    'relics': [
+        { id: 'lith', label: 'LITH', filter: (i) => i.name.startsWith('Lith') },
+        { id: 'meso', label: 'MESO', filter: (i) => i.name.startsWith('Meso') },
+        { id: 'neo', label: 'NEO', filter: (i) => i.name.startsWith('Neo') },
+        { id: 'axi', label: 'AXI', filter: (i) => i.name.startsWith('Axi') },
+        { id: 'requiem', label: 'REQUIEM', filter: (i) => i.name.startsWith('Requiem') }
+    ],
+    'mods': [
+        { id: 'base', label: 'MODS', filter: (i) => i.category === 'Mods' && !i.name.includes('Riven') },
+        { id: 'arcanes', label: 'ARCANES', filter: (i) => i.category === 'Arcanes' }
+    ],
+    'companions': [
+        { id: 'sentinel', label: 'SENTINELS', filter: (i) => (i.type || "").toLowerCase().includes('sentinel') },
+        { id: 'beast', label: 'BEASTS', filter: (i) => (i.type || "").toLowerCase().includes('kubrow') || (i.type || "").toLowerCase().includes('kavat') }
+    ]
+};
+
+export default function CodexListPage({ initialData = [], pageTitle, categoryMode = null }) {
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const pathname = usePathname();
+    const { ownedCards, toggleOwned, importItems } = useOwnedItems();
+    
+    const [selectedItem, setSelectedItem] = useState(null);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [showMissingOnly, setShowMissingOnly] = useState(false);
+    const [visibleCount, setVisibleCount] = useState(60);
+    const [variantFilter, setVariantFilter] = useState('all');
+
+    const customCategories = categoryMode ? CATEGORIES[categoryMode] : null;
+    const defaultCat = customCategories ? customCategories[0].id : 'all';
+    const subCategory = searchParams.get('sub') || defaultCat;
+    const activeConfig = customCategories ? customCategories.find(c => c.id === subCategory) : null;
+
+    const processedData = useMemo(() => {
+        return initialData.filter(item => {
+            if (searchTerm && !item.name.toLowerCase().includes(searchTerm)) return false;
+            if (showMissingOnly && ownedCards.has(item.uniqueName)) return false;
+            if (activeConfig && activeConfig.filter && !activeConfig.filter(item)) return false;
+            if (categoryMode !== 'relics') {
+                if (variantFilter === 'prime' && !item.name.includes('Prime')) return false;
+                if (variantFilter === 'base' && item.name.includes('Prime')) return false;
+            }
+            return true;
+        });
+    }, [initialData, subCategory, searchTerm, showMissingOnly, ownedCards, activeConfig, variantFilter, categoryMode]);
+
+    const handleCategoryChange = (id) => {
+        const p = new URLSearchParams(searchParams.toString());
+        p.set('sub', id);
+        router.push(`${pathname}?${p.toString()}`);
+    };
+
+    const handleImportAleca = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                const json = JSON.parse(ev.target.result);
+                importItems(Array.isArray(json) ? json : [], initialData);
+                alert("Database Synced.");
+            } catch(e) { alert("Corrupt Data."); }
+        };
+        reader.readAsText(file);
+    };
+
+    const progressPercent = (ownedCards.size / (initialData.length || 1)) * 100;
+
+    return (
+        <div className="h-screen w-full flex flex-col bg-[#050505] overflow-hidden font-sans relative">
+            
+            {/* --- HEADER HUD --- */}
+            <div className="shrink-0 bg-[#0f0f11]/90 backdrop-blur-md border-b border-[#333] z-50 flex flex-col shadow-2xl">
+                
+                {/* Top Bar: Nav & Title */}
+                <div className="flex items-center justify-between h-[64px] px-8 border-b border-[#1a1a1e]">
+                    <div className="flex items-center gap-6">
+                        <a href={BASE_PATH || '/'} className="text-[#8b8b95] hover:text-[#4da6ff] transition-colors text-2xl font-bold flex items-center gap-2 group no-underline">
+                            <span className="group-hover:-translate-x-1 transition-transform">◂</span> 
+                            <span className="text-xs font-bold tracking-[0.2em] uppercase">Orbiter</span>
+                        </a>
+                        
+                        <div className="h-6 w-[1px] bg-[#333] skew-x-[-15deg]"></div>
+
+                        <h1 className="text-3xl font-black text-white tracking-[0.05em] uppercase m-0 flex items-center gap-3">
+                            {pageTitle}
+                            <span className="text-[10px] bg-[#222] text-[#888] px-2 py-0.5 rounded-sm tracking-widest font-bold">DATABASE</span>
+                        </h1>
+                    </div>
+
+                    {/* Right: Counters */}
+                    <div className="text-right">
+                         <div className="text-[9px] text-[#666] uppercase tracking-[0.2em] font-bold mb-1">Items Mastered</div>
+                         <div className="text-xl font-bold text-[#c5a059] leading-none">
+                            {ownedCards.size} <span className="text-sm text-[#444]">/ {initialData.length}</span>
+                         </div>
+                    </div>
+                </div>
+
+                {/* Sub-Header: Controls & Filters */}
+                <div className="flex flex-wrap items-center px-8 py-4 gap-6 bg-[#0a0a0c]">
+                    
+                    {/* Categories Tabs */}
+                    {customCategories && customCategories.length > 1 && (
+                        <div className="flex gap-1 mr-4 border-r border-[#222] pr-6">
+                            {customCategories.map(c => (
+                                <button 
+                                    key={c.id} 
+                                    onClick={() => handleCategoryChange(c.id)}
+                                    className={`
+                                        text-[11px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-sm transition-all
+                                        ${subCategory === c.id 
+                                            ? 'bg-[#c5a059] text-black shadow-[0_0_10px_rgba(197,160,89,0.3)]' 
+                                            : 'text-[#666] hover:text-white hover:bg-[#222]'}
+                                    `}
+                                >
+                                    {c.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Search Input Tech */}
+                    <div className="relative group flex-grow max-w-[300px]">
+                        <div className="absolute left-0 bottom-0 w-full h-[1px] bg-[#333] group-focus-within:bg-[#4da6ff] transition-colors"></div>
+                        <input 
+                            type="text" 
+                            className="w-full bg-transparent text-white pl-1 py-1 text-sm font-bold uppercase tracking-wider focus:outline-none placeholder-[#444]" 
+                            placeholder="SEARCH TERMINAL..." 
+                            onChange={(e) => setSearchTerm(e.target.value.toLowerCase())} 
+                        />
+                        <span className="absolute right-0 top-1.5 text-[#4da6ff] text-[10px] opacity-50 group-focus-within:opacity-100">🔍</span>
+                    </div>
+
+                    {/* Filters Group */}
+                    <div className="flex items-center gap-3 ml-auto">
+                        
+                        {/* Variant Toggles */}
+                        {categoryMode !== 'relics' && (
+                            <div className="flex bg-[#121214] p-[2px] rounded-sm border border-[#222]">
+                                {['all', 'base', 'prime'].map(mode => (
+                                    <button 
+                                        key={mode} 
+                                        onClick={() => setVariantFilter(mode)} 
+                                        className={`
+                                            px-4 py-1 text-[10px] font-bold uppercase rounded-sm transition-all
+                                            ${variantFilter === mode 
+                                                ? 'bg-[#333] text-white shadow-inner' 
+                                                : 'text-[#555] hover:text-[#aaa]'}
+                                        `}
+                                    >
+                                        {mode}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Missing Toggle (Styled) */}
+                        <label className={`
+                            flex items-center gap-2 cursor-pointer px-3 py-1.5 border rounded-sm transition-all select-none
+                            ${showMissingOnly ? 'border-[#c5a059] bg-[#c5a059]/10' : 'border-[#333] hover:border-[#555]'}
+                        `}>
+                            <div className={`w-2 h-2 rounded-full ${showMissingOnly ? 'bg-[#c5a059] shadow-[0_0_5px_#c5a059]' : 'bg-[#444]'}`}></div>
+                            <span className={`text-[10px] font-bold uppercase tracking-wide ${showMissingOnly ? 'text-[#c5a059]' : 'text-[#666]'}`}>Missing</span>
+                            <input type="checkbox" onChange={(e) => setShowMissingOnly(e.target.checked)} className="hidden" /> 
+                        </label>
+
+                        {/* Import Button */}
+                        <button 
+                            className="ml-4 text-[10px] font-bold text-[#4da6ff] hover:text-white border border-[#4da6ff]/30 hover:border-[#4da6ff] bg-[#4da6ff]/5 px-3 py-1.5 rounded-sm transition-all flex items-center gap-2"
+                            onClick={() => document.getElementById('imp').click()}
+                        >
+                            DATA UPLOAD
+                        </button>
+                        <input type="file" id="imp" className="hidden" onChange={handleImportAleca} />
+                    </div>
+                </div>
+
+                {/* Progress Bar Line */}
+                <div className="w-full h-[2px] bg-[#111] relative">
+                    <div 
+                        className="h-full bg-gradient-to-r from-[#c5a059] to-[#f1c40f] shadow-[0_0_10px_#c5a059]" 
+                        style={{width: `${progressPercent}%`, transition: 'width 1s cubic-bezier(0.4, 0, 0.2, 1)'}}
+                    ></div>
+                </div>
+            </div>
+
+            {/* --- CONTENT GRID --- */}
+            <div 
+                className="flex-1 overflow-y-auto p-8 custom-scrollbar" 
+                onScroll={(e) => {
+                    if (e.target.scrollTop + e.target.clientHeight >= e.target.scrollHeight - 500) setVisibleCount(p => p + 60);
+                }}
+            >
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(230px,1fr))] gap-5 pb-20 max-w-[2000px] mx-auto">
+                    {processedData.slice(0, visibleCount).map(item => (
+                        <div key={item.uniqueName} onClick={() => setSelectedItem(item)} className="cursor-pointer">
+                            <CodexCard item={item} isOwned={ownedCards.has(item.uniqueName)} onToggleOwned={toggleOwned} />
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {selectedItem && (
+                <WarframeDetailModal 
+                    item={selectedItem} 
+                    onClose={() => setSelectedItem(null)} 
+                    ownedItems={ownedCards} 
+                    onToggle={toggleOwned} 
+                />
+            )}
+        </div>
+    );
+}
+
+==================================================
+FILE: src\components\WarframeDetailModal.js
+==================================================
+
+// src/components/WarframeDetailModal.js
+"use client";
+import { useEffect } from 'react';
+import { IMG_BASE_URL } from '@/utils/constants';
+import { useItemStrategy } from '@/hooks/useItemStrategy';
+
+export default function WarframeDetailModal({ item, onClose, ownedItems, onToggle }) {
+    // Usiamo il Custom Hook per separare la logica
+    const { 
+        componentsList, 
+        farmingStrategy, 
+        selectedRelics, 
+        toggleRelic, 
+        loadingRelics,
+        isRelicItem 
+    } = useItemStrategy(item);
+
+    // Blocca scroll body
+    useEffect(() => { 
+        document.body.style.overflow = 'hidden'; 
+        return () => { document.body.style.overflow = 'unset'; }; 
+    }, []);
+
+    if (!item) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+            {/* Container Principale */}
+            <div 
+                className="w-full max-w-[1600px] h-[90vh] bg-[#121214] border border-[#333] border-t-4 border-t-[#d4af37] flex overflow-hidden relative shadow-[0_0_50px_rgba(0,0,0,1)]" 
+                onClick={e => e.stopPropagation()}
+            >
+                {/* Close Button */}
+                <button className="absolute top-4 right-6 text-3xl text-white hover:text-[#d4af37] z-50" onClick={onClose}>×</button>
+
+                {/* --- COLONNA 1: INFO (25%) --- */}
+                <div className="w-1/4 min-w-[300px] bg-[#0a0a0c] border-r border-[#333] p-8 flex flex-col">
+                    <h2 className="text-3xl font-black uppercase text-white leading-none">{item.name}</h2>
+                    <div className="text-[#d4af37] text-sm font-bold uppercase tracking-widest mt-2 mb-8">
+                        {item.type} {isRelicItem ? '(Relic)' : ''}
+                    </div>
+                    
+                    <div className="flex-1 flex items-center justify-center mb-6">
+                        {item.imageName && (
+                            <img 
+                                src={`${IMG_BASE_URL}/${item.imageName}`} 
+                                alt={item.name} 
+                                className="max-w-full max-h-[400px] object-contain drop-shadow-[0_0_30px_rgba(0,0,0,0.5)]" 
+                            />
+                        )}
+                    </div>
+                    
+                    <div className="text-gray-400 text-xs leading-relaxed overflow-y-auto max-h-[200px] pr-2 custom-scrollbar">
+                        {isRelicItem && item.rewards ? (
+                            <div>
+                                <strong className="text-white block mb-2">CONTAINS:</strong>
+                                {item.rewards.map((r, i) => (
+                                    <div key={i} className="flex justify-between border-b border-[#222] py-1">
+                                        <span>{r.item || r.item_name}</span>
+                                        <span className="text-[#d4af37] text-[10px]">{r.rarity}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div dangerouslySetInnerHTML={{__html: item.description?.replace(/\r\n/g, "<br>")}}></div>
+                        )}
+                    </div>
+                </div>
+
+                {/* --- COLONNA 2: COMPONENTI (40%) --- */}
+                {!isRelicItem && (
+                    <div className="w-2/5 flex flex-col border-r border-[#333] bg-[#121214]">
+                        <div className="p-5 bg-[#1a1a1e] border-b border-[#333] text-sm font-bold text-white tracking-widest uppercase flex justify-between items-center">
+                            <span>Components & Relics</span>
+                            {loadingRelics && <span className="text-[#d4af37] text-xs animate-pulse">Loading DB...</span>}
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+                            {componentsList.length === 0 ? (
+                                <div className="text-center text-gray-500 italic mt-10">No components found.</div>
+                            ) : (
+                                componentsList.map(comp => (
+                                    <div key={comp.uniqueName} className="bg-[#18181b] border border-[#27272a] rounded-lg p-4">
+                                        <div className="flex justify-between items-center mb-3 border-l-4 border-blue-500 pl-3">
+                                            <span className="font-bold text-white text-sm uppercase">{comp.name}</span>
+                                            <span className={`text-[10px] font-bold ${ownedItems.has(comp.uniqueName) ? "text-green-500" : "text-gray-600"}`}>
+                                                {ownedItems.has(comp.uniqueName) ? "OWNED" : "MISSING"}
+                                            </span>
+                                        </div>
+
+                                        <div className="flex flex-wrap gap-2">
+                                            {comp.relics.length === 0 ? (
+                                                <span className="text-gray-600 text-xs">No Relic Data</span>
+                                            ) : (
+                                                comp.relics.map(rel => (
+                                                    <button
+                                                        key={rel.name}
+                                                        onClick={() => toggleRelic(rel.name)}
+                                                        className={`
+                                                            group flex items-center gap-2 px-3 py-1.5 rounded border text-xs font-bold transition-all
+                                                            ${selectedRelics.has(rel.name) 
+                                                                ? 'bg-[#d4af37] text-black border-[#d4af37] shadow-[0_0_10px_rgba(212,175,55,0.4)]' 
+                                                                : 'bg-[#222] text-gray-300 border-[#444] hover:bg-[#333] hover:border-white'}
+                                                        `}
+                                                    >
+                                                        <span className={`w-2 h-2 rounded-full shadow-sm
+                                                            ${rel.rarity === 'Common' ? 'bg-[#cd7f32]' : 
+                                                              rel.rarity === 'Uncommon' ? 'bg-[#c0c0c0]' : 'bg-[#d4af37]'}
+                                                        `}></span>
+                                                        {rel.name}
+                                                    </button>
+                                                ))
+                                            )}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* --- COLONNA 3: STRATEGIA (RESTANTE) --- */}
+                <div className="flex-1 flex flex-col bg-[#0e0e10]">
+                    <div className="p-5 bg-[#1a1a1e] border-b border-[#333] text-sm font-bold text-white tracking-widest uppercase">
+                        Drop Locations {selectedRelics.size > 0 && <span className="text-[#d4af37]">({selectedRelics.size})</span>}
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+                        {farmingStrategy && farmingStrategy.noData.length > 0 && (
+                            <div className="mb-4 p-4 bg-red-900/10 border border-red-500/50 rounded text-red-400 text-xs text-center font-bold">
+                                ⚠ NO DATA / VAULTED: {farmingStrategy.noData.join(", ")}
+                            </div>
+                        )}
+
+                        {farmingStrategy && farmingStrategy.missions.length > 0 ? (
+                            <div className="space-y-2">
+                                {farmingStrategy.missions.map((m, i) => (
+                                    <div key={i} className="flex justify-between items-center bg-[#1a1a1e] border border-[#333] p-3 rounded hover:border-[#555] transition-colors">
+                                        <div className="text-white text-sm font-bold">
+                                            {m.location} {m.rotation && <span className="text-[#d4af37] ml-2">Rot {m.rotation}</span>}
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-[#d4af37] text-[10px] font-bold uppercase">{m.relic}</div>
+                                            <div className="text-blue-400 text-xs font-bold">{(m.chance * 100).toFixed(2)}%</div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-gray-600 text-sm italic">
+                                {selectedRelics.size > 0 ? "No farming locations found." : "Select a relic to view drop locations."}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+==================================================
+FILE: src\hooks\useItemStrategy.js
+==================================================
+
+// src/hooks/useItemStrategy.js
+import { useState, useEffect, useMemo } from 'react';
+
+// Utility pulizia nomi
+const cleanRelicName = (fullName) => {
+    return fullName.replace(" Relic", "").replace(/\s*\(.*?\)/g, "").trim();
+};
+
+export function useItemStrategy(item) {
+    const [relicMap, setRelicMap] = useState(new Map());
+    const [selectedRelics, setSelectedRelics] = useState(new Set());
+    const [loadingRelics, setLoadingRelics] = useState(false);
+
+    const isRelicItem = item?.category === 'Relics';
+
+    // 1. Parsing Componenti
+    const componentsList = useMemo(() => {
+        if (isRelicItem || !item || !item.components) return [];
+        
+        const validParts = ['Blueprint', 'Chassis', 'Neuroptics', 'Systems', 'Harness', 'Wings', 'Engine', 'Cortex', 'Carapace', 'Cerebrum'];
+        const filteredComponents = item.components.filter(comp => validParts.some(part => comp.name.includes(part)));
+        
+        // Ordinamento logico
+        const order = ['Blueprint', 'Neuroptics', 'Chassis', 'Systems'];
+        const sorted = [...filteredComponents].sort((a, b) => {
+            const ia = order.findIndex(k => a.name.includes(k));
+            const ib = order.findIndex(k => b.name.includes(k));
+            return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+        });
+
+        // Estrazione nomi reliquie necessarie
+        return sorted.map(comp => {
+            const rawRelics = (comp.drops || []).filter(d => d.location.includes(" Relic"));
+            const uniqueRelics = new Map();
+            
+            rawRelics.forEach(d => {
+                const baseName = cleanRelicName(d.location);
+                if (!uniqueRelics.has(baseName)) {
+                    uniqueRelics.set(baseName, { 
+                        name: baseName, 
+                        rarity: d.rarity || 'Common', 
+                        chance: d.chance 
+                    });
+                }
+            });
+
+            return {
+                name: comp.name.replace(item.name, "").replace("Blueprint", "BP").trim(),
+                uniqueName: comp.uniqueName,
+                relics: Array.from(uniqueRelics.values()).sort((a,b) => a.name.localeCompare(b.name))
+            };
+        });
+    }, [item, isRelicItem]);
+
+    // 2. Fetch Ottimizzato Reliquie (Solo quelle necessarie)
+    useEffect(() => {
+        if (!item) return;
+
+        let relicsToFetch = [];
+        if (isRelicItem) {
+            relicsToFetch.push(cleanRelicName(item.name));
+            setSelectedRelics(new Set([cleanRelicName(item.name)])); // Auto-select se è reliquia
+        } else {
+            // Raccogli tutti i nomi delle reliquie dai componenti
+            componentsList.forEach(c => c.relics.forEach(r => relicsToFetch.push(r.name)));
+        }
+
+        // Rimuovi duplicati
+        relicsToFetch = [...new Set(relicsToFetch)];
+
+        if (relicsToFetch.length > 0) {
+            setLoadingRelics(true);
+            fetch('/api/relics/lookup', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ names: relicsToFetch })
+            })
+            .then(res => res.json())
+            .then(data => {
+                const map = new Map(data.map(r => [r.name, r]));
+                setRelicMap(map);
+            })
+            .finally(() => setLoadingRelics(false));
+        }
+    }, [item, componentsList, isRelicItem]);
+
+    // 3. Calcolo Strategia Farming
+    const farmingStrategy = useMemo(() => {
+        if (selectedRelics.size === 0) return null;
+        const missions = [];
+        const noDataRelics = [];
+
+        selectedRelics.forEach(relicName => {
+            const info = relicMap.get(relicName);
+            // Se info manca ma siamo nella vista reliquia, usiamo i drop dell'item stesso
+            const drops = info?.drops?.length > 0 ? info.drops : (isRelicItem ? item.drops : []);
+
+            if (!drops || drops.length === 0) {
+                noDataRelics.push(relicName);
+            } else {
+                drops.forEach(d => {
+                    missions.push({
+                        location: d.location,
+                        relic: relicName,
+                        chance: d.chance,
+                        rotation: d.rotation
+                    });
+                });
+            }
+        });
+
+        return {
+            missions: missions.sort((a, b) => b.chance - a.chance).slice(0, 50),
+            noData: noDataRelics
+        };
+    }, [selectedRelics, relicMap, item, isRelicItem]);
+
+    const toggleRelic = (name) => {
+        setSelectedRelics(prev => {
+            const next = new Set(prev);
+            if (next.has(name)) next.delete(name);
+            else next.add(name);
+            return next;
+        });
+    };
+
+    return { 
+        componentsList, 
+        farmingStrategy, 
+        selectedRelics, 
+        toggleRelic,
+        loadingRelics,
+        isRelicItem
+    };
+}
+
+==================================================
+FILE: src\hooks\useOwnedItems.js
+==================================================
+
+// src/hooks/useOwnedItems.js
+"use client";
+import { useState, useEffect, useCallback } from 'react';
+
+const STORAGE_KEY = 'warframe_codex_v7';
+
+export function useOwnedItems() {
+    const [ownedCards, setOwnedCards] = useState(new Set());
+    const [isLoaded, setIsLoaded] = useState(false);
+
+    // Carica dati all'avvio
+    useEffect(() => {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            try {
+                setOwnedCards(new Set(JSON.parse(saved)));
+            } catch (e) {
+                console.error("Errore lettura salvataggio", e);
+            }
+        }
+        setIsLoaded(true);
+    }, []);
+
+    // Salva dati ad ogni modifica
+    useEffect(() => {
+        if (isLoaded) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify([...ownedCards]));
+        }
+    }, [ownedCards, isLoaded]);
+
+    // Funzione ottimizzata per toggle
+    const toggleOwned = useCallback((id) => {
+        setOwnedCards(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(id)) newSet.delete(id);
+            else newSet.add(id);
+            return newSet;
+        });
+    }, []);
+
+    // Funzione per import massivo (es. da file JSON)
+    const importItems = useCallback((itemsArray, rawData) => {
+        setOwnedCards(prev => {
+            const newSet = new Set(prev);
+            let count = 0;
+            itemsArray.forEach(entry => {
+                const name = (typeof entry === 'string' ? entry : entry.item_name || entry.name).toLowerCase();
+                const found = rawData.find(i => i.name.toLowerCase() === name);
+                if (found) {
+                    newSet.add(found.uniqueName);
+                    count++;
+                }
+            });
+            return newSet;
+        });
+    }, []);
+
+    return { ownedCards, toggleOwned, importItems, isLoaded };
+}
+
+==================================================
+FILE: src\utils\categoryConfig.js
+==================================================
+
+// src/utils/categoryConfig.js
+
+const isArcane = (item) => item.category === 'Arcanes' || (item.type && item.type.toLowerCase().includes('arcane'));
+const isGalvanized = (item) => item.name.includes('Galvanized ') || item.name.includes('Primed ') || item.name.includes('Amalgam ');
+const isArchon = (item) => item.name.includes('Archon ');
+const isWeaponType = (item) => {
+    const t = (item.type || "").toLowerCase();
+    return t.includes('primary') || t.includes('secondary') || t.includes('melee') || t.includes('gun');
+};
+
+export const CATEGORY_CONFIGS = {
+    'warframes': [
+        { id: 'all', label: 'WARFRAMES', filter: (item) => (item.type || "").toLowerCase() === 'warframe' }
+    ],
+    'companions': [
+        {
+            id: 'robotic', label: 'SENTINELS', 
+            filter: (item) => {
+                const t = (item.type || "").toLowerCase();
+                return t.includes('sentinel') || t.includes('robotic') || t.includes('moa');
+            }
+        },
+        {
+            id: 'beast', label: 'BEASTS',
+            filter: (item) => {
+                const t = (item.type || "").toLowerCase();
+                return t.includes('kubrow') || t.includes('kavat') || t.includes('beast');
+            }
+        },
+        {
+            id: 'necramech', label: 'NECRAMECHS',
+            filter: (item) => (item.type || "").toLowerCase().includes('necramech')
+        }
+    ],
+    'mods': [
+        {
+            id: 'base', label: 'BASE MODS',
+            filter: (item) => {
+                const isSpecial = isGalvanized(item) || isArchon(item) || item.name.includes('Riven') || isArcane(item);
+                const isMod = item.category === 'Mods' || (item.type || "").toLowerCase().includes('aura');
+                return !isSpecial && isMod;
+            },
+            subFilters: [
+                { id: 'all', label: 'ALL', filter: () => true }, // Changed TUTTI -> ALL
+                { id: 'wf', label: 'WARFRAME', filter: (item) => (item.type || "").toLowerCase().includes('warframe') },
+                { id: 'wep', label: 'WEAPONS', filter: (item) => isWeaponType(item) }
+            ]
+        },
+        {
+            id: 'elite', label: 'PRIMED & GALVANIZED',
+            filter: (item) => isGalvanized(item)
+        },
+        {
+            id: 'arcanes', label: 'ARCANES',
+            filter: (item) => isArcane(item)
+        }
+    ]
+};
+
+==================================================
+FILE: src\utils\constants.js
+==================================================
+
+// src/utils/constants.js
+
+// URL RAW della repository ufficiale WFCD (la più aggiornata)
+export const API_BASE_URL = "https://raw.githubusercontent.com/WFCD/warframe-items/master/data/json";
+export const IMG_BASE_URL = "https://cdn.warframestat.us/img";
+
+export const COLORS = {
+    common: '#a89686',
+    uncommon: '#c0c0c0',
+    rare: '#d4af37',
+    legendary: '#b0c9ec',
+    arcane: '#00ffcc',
+    syndicate: '#a29bfe',
+    special: '#fab1a0',
+    mission: '#48dbfb',
+    enemy: '#ff6b6b'
+};
+
+export const REPO_NAME = 'warframecodex-next';
+export const BASE_PATH = process.env.NODE_ENV === 'production' ? `/${REPO_NAME}` : '';
+
+==================================================
+FILE: src\utils\relicUtils.js
+==================================================
+
+// src/utils/relicUtils.js
+import { fetchGameData } from '@/utils/serverData';
+
+// Mappa globale per la sessione client
+let relicCache = null;
+
+export async function getRelicDatabase() {
+    if (relicCache) return relicCache;
+
+    try {
+        // Scarica il file Relics.json (che ora è locale grazie a serverData)
+        // Nota: In Next.js App Router, per i client component, usiamo una API route interna
+        // Ma per semplificare, possiamo fare una chiamata fetch al file statico o usare l'API che creeremo
+        const res = await fetch('/database_api/Relics.json'); // Legge dalla cartella public o via API
+        
+        // Se non funziona (es. siamo lato server), usiamo un fallback o l'API
+        let data;
+        if (!res.ok) {
+             // Fallback: prova a chiamare l'API di sync se il file non è accessibile direttamente
+             const apiRes = await fetch('/api/sync-db'); 
+             // Questo è un workaround, l'ideale è che il client riceva i dati puliti
+             data = await apiRes.json(); // Questo tornerebbe tutto, è pesante.
+             // Meglio: Il client component riceve i dati delle reliquie via props o fetch ottimizzata.
+             // Per ora assumiamo che il file sia accessibile o usiamo un metodo diretto.
+             return new Map(); 
+        } else {
+             data = await res.json();
+        }
+
+        const map = new Map();
+        
+        data.forEach(item => {
+            // FILTRO RIGIDO: Solo Reliquie, NO Radiant/Flawless/Exceptional
+            if (item.category === 'Relics' && 
+                !item.name.includes('(Radiant)') && 
+                !item.name.includes('(Flawless)') && 
+                !item.name.includes('(Exceptional)')) {
+                
+                // Pulizia Nome: "Lith G1 Relic (Intact)" -> "Lith G1"
+                const cleanName = item.name
+                    .replace(" Relic", "")
+                    .replace(" (Intact)", "")
+                    .trim();
+                
+                map.set(cleanName, {
+                    id: item.uniqueName,
+                    name: cleanName,
+                    image: item.imageName,
+                    drops: item.drops || [], // Dove si trova questa reliquia
+                    vaulted: !item.drops || item.drops.length === 0
+                });
+            }
+        });
+
+        relicCache = map;
+        return map;
+    } catch (e) {
+        console.error("Relic DB Error", e);
+        return new Map();
+    }
+}
+
+==================================================
+FILE: src\utils\serverData.js
+==================================================
+
+// src/utils/serverData.js
+import fs from 'fs/promises';
+import path from 'path';
+import { API_BASE_URL } from './constants';
+
+const DB_FOLDER = path.join(process.cwd(), 'database_api');
+
+// CACHE GLOBALE IN MEMORIA (Singleton pattern)
+global.dataCache = global.dataCache || {};
+
+export async function fetchGameData(filename, forceRefresh = false) {
+    const filePath = path.join(DB_FOLDER, filename);
+
+    // 1. CONTROLLO CACHE RAM (Velocità Massima)
+    if (!forceRefresh && global.dataCache[filename]) {
+        return global.dataCache[filename];
+    }
+
+    // 2. CONTROLLO LOCALE SU DISCO
+    if (!forceRefresh) {
+        try {
+            const fileContent = await fs.readFile(filePath, 'utf-8');
+            const json = JSON.parse(fileContent);
+            if (Array.isArray(json) && json.length > 0) {
+                // Salva in RAM per la prossima volta
+                global.dataCache[filename] = json;
+                return json;
+            }
+        } catch (error) {
+            // File mancante o corrotto, procedi al download
+        }
+    }
+
+    // 3. DOWNLOAD DA GITHUB
+    try {
+        console.log(`[SERVER] Downloading ${filename}...`);
+        const url = `${API_BASE_URL}/${filename}`;
+        const res = await fetch(url, { cache: 'no-store' }); // No fetch cache
+        if (!res.ok) throw new Error(`HTTP Error ${res.status}: ${url}`);
+        
+        const data = await res.json();
+
+        // 4. SALVATAGGIO DISCO + RAM
+        try {
+            await fs.mkdir(DB_FOLDER, { recursive: true });
+            await fs.writeFile(filePath, JSON.stringify(data, null, 2));
+            global.dataCache[filename] = data; // Aggiorna RAM
+            console.log(`[SERVER] Saved: ${filePath}`);
+        } catch (writeErr) {
+            console.error(`[SERVER] Disk write error:`, writeErr);
+        }
+
+        return data;
+    } catch (error) {
+        console.error(`[SERVER ERROR] Failed to load ${filename}:`, error);
+        return [];
+    }
+}
+
+export async function fetchRelicsDB() {
+    return await fetchGameData('Relics.json');
+}

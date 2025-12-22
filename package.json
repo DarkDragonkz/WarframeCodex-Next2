@@ -9,9 +9,11 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "dompurify": "^3.3.1",
     "next": "16.1.0",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "warframe-items": "^1.1269.87"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

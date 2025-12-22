@@ -1,0 +1,7 @@
+import CodexListPage from '@/components/CodexListPage';
+import { fetchGameData } from '@/utils/serverData';
+
+export default async function Page() {
+    const data = await fetchGameData('Primary.json');
+    return <CodexListPage initialData={data} pageTitle="PRIMARY WEAPONS" />;
+}

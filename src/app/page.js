@@ -1,65 +1,87 @@
-import Image from "next/image";
+"use client";
+import Link from 'next/link';
+import { useState, useEffect } from 'react';
+import { API_BASE_URL, IMG_BASE_URL } from '@/utils/constants';
 
-export default function Home() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.js file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+// Aggiunto "Relics" alla lista
+const CATEGORIES = [
+    { id: 'warframes', title: 'Warframes', subtitle: 'The Arsenal', color: '#d4af37', link: '/warframes', jsonFile: 'Warframes.json' },
+    { id: 'primary', title: 'Primary', subtitle: 'Rifles & Bows', color: '#ff6b6b', link: '/primary', jsonFile: 'Primary.json' },
+    { id: 'secondary', title: 'Secondary', subtitle: 'Pistols', color: '#ff9f43', link: '/secondary', jsonFile: 'Secondary.json' },
+    { id: 'melee', title: 'Melee', subtitle: 'Blades & Whips', color: '#feca57', link: '/melee', jsonFile: 'Melee.json' },
+    { id: 'mods', title: 'Mods', subtitle: 'Upgrades', color: '#54a0ff', link: '/mods', jsonFile: 'Mods.json' },
+    { id: 'relics', title: 'Relics', subtitle: 'Void Fissures', color: '#00d2d3', link: '/relics', jsonFile: 'Relics.json' }, // <--- NUOVA
+    { id: 'companions', title: 'Companions', subtitle: 'Sentinels', color: '#1dd1a1', link: '/companions', jsonFile: 'Sentinels.json' },
+    { id: 'amps', title: 'Amps', subtitle: 'Void Weapons', color: '#a29bfe', link: '/amps', jsonFile: 'Amps.json' }
+];
+
+function ApiImageCard({ cat }) {
+    const [imgUrl, setImgUrl] = useState(null);
+
+    useEffect(() => {
+        let isMounted = true;
+        async function fetchImage() {
+            try {
+                const res = await fetch(`${API_BASE_URL}/${cat.jsonFile}`);
+                if (!res.ok) return;
+                const data = await res.json();
+                
+                // Logica speciale per le Reliquie: prende la prima "Intact" o la prima disponibile
+                let targetItem;
+                if (cat.id === 'relics') {
+                    targetItem = data.find(item => item.imageName && item.name.includes('Intact'));
+                } else {
+                    targetItem = data.find(item => item.name.includes("Prime") && item.imageName);
+                }
+                
+                const firstValid = targetItem || data.find(item => item.imageName && !item.imageName.includes("fanart"));
+                
+                if (firstValid && isMounted) setImgUrl(`${IMG_BASE_URL}/${firstValid.imageName}`);
+            } catch (e) { console.error(e); }
+        }
+        fetchImage();
+        return () => { isMounted = false; };
+    }, [cat.jsonFile, cat.id]);
+
+    return (
+        <Link href={cat.link} style={{textDecoration:'none'}}>
+            <div 
+                className="menu-card"
+                style={{ '--card-color': cat.color, '--card-glow': `${cat.color}66` }}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+                <div className="card-visual-area">
+                    {imgUrl ? <img src={imgUrl} alt={cat.title} className="card-img-element" /> : <div style={{background:'#111', width:'100%', height:'100%'}}></div>}
+                </div>
+                <div className="card-content">
+                    <h2 className="card-title" style={{color: cat.color}}>{cat.title}</h2>
+                    <p className="card-sub">{cat.subtitle}</p>
+                </div>
+            </div>
+        </Link>
+    );
+}
+
+export default function LandingPage() {
+    return (
+        <main className="landing-page">
+            <div className="landing-content">
+                <div className="landing-header">
+                    <h1 className="landing-title">ORDIS CODEX</h1>
+                    <div className="landing-subtitle">Tracker & Database System</div>
+                </div>
+
+                <div className="cards-scroll-container">
+                    <div className="cards-row">
+                        {CATEGORIES.map((cat) => (
+                            <ApiImageCard key={cat.id} cat={cat} />
+                        ))}
+                    </div>
+                </div>
+                
+                <div style={{marginTop:'40px', color:'#444', fontSize:'10px', textTransform:'uppercase', letterSpacing:'2px'}}>
+                    Operator Interface v2.0
+                </div>
+            </div>
+        </main>
+    );
 }
