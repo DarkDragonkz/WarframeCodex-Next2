@@ -1,7 +1,8 @@
 "use client";
 import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import Link from 'next/link'; // Importante per GitHub Pages
+// IMPORTANTE: Link gestisce automaticamente il percorso /warframecodex-next/
+import Link from 'next/link'; 
 import CodexCard from './CodexCard';
 import WarframeDetailModal from './WarframeDetailModal';
 import { useOwnedItems } from '@/hooks/useOwnedItems';
@@ -29,7 +30,6 @@ function CodexContent({ filesToLoad = [], pageTitle, customCategories = null, ma
     const [visibleCount, setVisibleCount] = useState(60);
 
     const activeConfig = customCategories ? customCategories.find(c => c.id === subCategory) : null;
-    const filesHash = filesToLoad.join(',');
 
     useEffect(() => {
         async function load() {
@@ -50,7 +50,7 @@ function CodexContent({ filesToLoad = [], pageTitle, customCategories = null, ma
             try {
                 if (filesToLoad.length === 0) { setLoading(false); return; }
 
-                // Fetch sicura con API_BASE_URL (che ora include il nome del repo)
+                // Carica i dati JSON dal tuo repo
                 const [dataResults, lookupRes] = await Promise.all([
                     Promise.all(filesToLoad.map(f => fetch(`${API_BASE_URL}/${f}`).then(r => r.json()))),
                     fetch(`${API_BASE_URL}/RelicLookup.json`).then(r => r.ok ? r.json() : null)
@@ -102,7 +102,7 @@ function CodexContent({ filesToLoad = [], pageTitle, customCategories = null, ma
             finally { setLoading(false); }
         }
         load();
-    }, [filesHash, manualData]);
+    }, [filesToLoad.join(','), manualData]);
 
     const processedData = useMemo(() => {
         return rawApiData.filter(item => {
@@ -136,7 +136,7 @@ function CodexContent({ filesToLoad = [], pageTitle, customCategories = null, ma
             <div className="header-group">
                 <div className="nav-top-row">
                     <div className="nav-brand">
-                        {/* LINK CORRETTO PER GITHUB PAGES */}
+                        {/* FIX: Usando Link invece di <a> il percorso GitHub viene rispettato */}
                         <Link href="/" className="nav-home-btn">⌂ HOME</Link>
                         <h1 className="page-title">{pageTitle}</h1>
                     </div>
