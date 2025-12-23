@@ -14,7 +14,6 @@ export default function WarframeDetailModal({ item, onClose, ownedItems, onToggl
     const [smartMissions, setSmartMissions] = useState([]);
     const [lookupData, setLookupData] = useState(null); 
     const [savedPartMap, setSavedPartMap] = useState({});
-    
     const [selectedRelics, setSelectedRelics] = useState(new Set());
     const [loadingStrategies, setLoadingStrategies] = useState(false);
     const [statusMsg, setStatusMsg] = useState(""); 
@@ -23,9 +22,14 @@ export default function WarframeDetailModal({ item, onClose, ownedItems, onToggl
 
     const isOwned = ownedItems.has(item.uniqueName);
     const isRelicItem = (item.category || "").includes('Relic') || (item.type || "").includes('Relic');
-    const mainDropsEmpty = !item.drops || item.drops.length === 0;
-    const isVaulted = item.vaulted || (isRelicItem && mainDropsEmpty);
     const wikiUrl = `https://warframe.fandom.com/wiki/${item.name.replace(/ /g, '_')}`;
+
+    // --- CALCOLO STATO VAULTED INTELLIGENTE ---
+    // Questo è il cuore della correzione.
+    // 1. Usiamo il valore 'vaulted' calcolato dal CodexListPage (se è stato passato nell'item).
+    // 2. Se non c'è, facciamo un fallback sul JSON puro.
+    // Nota: CodexListPage passa l'oggetto 'item' già corretto, quindi isVaulted sarà corretto.
+    const isVaulted = !!item.vaulted;
 
     useEffect(() => {
         const handleEsc = (e) => { if (e.key === 'Escape') onClose(); };
@@ -34,11 +38,12 @@ export default function WarframeDetailModal({ item, onClose, ownedItems, onToggl
         
         if (!isRelicItem && (item.components || item.drops)) {
             fetchFarmingData();
+        } else {
+            setLoadingStrategies(false);
         }
         return () => window.removeEventListener('keydown', handleEsc);
     }, [onClose, item]);
 
-    // --- UTILS ---
     function getStandardID(name) {
         if (!name) return null;
         const match = name.toUpperCase().match(/(LITH|MESO|NEO|AXI|REQUIEM)\s+([A-Z0-9]+)/);
@@ -60,15 +65,11 @@ export default function WarframeDetailModal({ item, onClose, ownedItems, onToggl
         return clean.toUpperCase();
     }
 
-    // --- HANDLER SELEZIONE ---
     const handleRelicClick = (relicId) => {
         if (!relicId) return;
         const newSet = new Set(selectedRelics);
-        if (newSet.has(relicId)) {
-            newSet.delete(relicId);
-        } else {
-            newSet.add(relicId);
-        }
+        if (newSet.has(relicId)) newSet.delete(relicId);
+        else newSet.add(relicId);
         setSelectedRelics(newSet);
     };
 
@@ -78,26 +79,33 @@ export default function WarframeDetailModal({ item, onClose, ownedItems, onToggl
 
     function calculateMissionsStrategy(relicIdsSet, dbData, partMap) {
         const missionMap = new Map();
-
+        
         relicIdsSet.forEach(relicID => {
-            // lookupData qui è un oggetto dove le chiavi sono "LITH G1", ecc.
-            // Se la struttura è diversa (array), va adattata. 
-            // Assumo che RelicLookup.json sia { "LITH G1": [...missions], ... } o simile.
-            // Se invece contiene anche info sull'immagine, possiamo usarlo.
-            
-            const relicInfo = dbData[relicID]; 
-            // NOTA: Se dbData contiene solo missioni, non abbiamo l'immagine qui.
-            // Ma stiamo usando dbData per le missioni, non per l'immagine nella card (quella la facciamo in formatDrops)
+            if (relicID.startsWith("DIRECT:")) {
+                const info = JSON.parse(relicID.substring(7)); 
+                const key = info.loc;
+                if (!missionMap.has(key)) missionMap.set(key, { missionName: key, totalScore: 0, relicsFound: [] });
+                const entry = missionMap.get(key);
+                if (!entry.relicsFound.some(r => r.part === info.part)) {
+                    entry.relicsFound.push({ 
+                        id: "DROP", 
+                        part: info.part, 
+                        drops: [{ rot: info.rarity || "-", chance: info.chance || 0 }], 
+                        maxChance: info.chance || 0 
+                    });
+                    entry.totalScore += (info.chance || 0);
+                }
+                return;
+            }
 
+            const relicInfo = dbData ? dbData[relicID] : null; 
             const missions = relicInfo ? (Array.isArray(relicInfo) ? relicInfo : relicInfo.drops) : [];
             const partName = partMap[relicID] || "PART";
-
+            
             if (missions) {
                 missions.forEach(mission => {
                     const key = mission.node;
-                    if (!missionMap.has(key)) {
-                        missionMap.set(key, { missionName: key, totalScore: 0, relicsFound: [] });
-                    }
+                    if (!missionMap.has(key)) missionMap.set(key, { missionName: key, totalScore: 0, relicsFound: [] });
                     const entry = missionMap.get(key);
                     let relicEntry = entry.relicsFound.find(r => r.id === relicID);
                     if (!relicEntry) {
@@ -120,8 +128,7 @@ export default function WarframeDetailModal({ item, onClose, ownedItems, onToggl
                 const uniquePartsB = new Set(b.relicsFound.map(r => r.part)).size;
                 if (uniquePartsB !== uniquePartsA) return uniquePartsB - uniquePartsA;
                 return b.totalScore - a.totalScore;
-            })
-            .slice(0, 15);
+            }).slice(0, 15);
     }
 
     async function fetchFarmingData() {
@@ -130,12 +137,21 @@ export default function WarframeDetailModal({ item, onClose, ownedItems, onToggl
         try {
             const neededIDs = new Set();
             const relicToPartMap = {}; 
+            
             const scan = (drops, partNameLabel) => {
                 (drops || []).forEach(d => {
                     const id = getStandardID(d.location);
-                    if (id) { neededIDs.add(id); relicToPartMap[id] = getCleanPartName(partNameLabel); }
+                    const cleanPart = getCleanPartName(partNameLabel);
+                    if (id) { 
+                        neededIDs.add(id); 
+                        relicToPartMap[id] = cleanPart; 
+                    } else {
+                        const fakeID = `DIRECT:${JSON.stringify({ loc: d.location, part: cleanPart, chance: d.chance, rarity: d.rarity })}`;
+                        neededIDs.add(fakeID);
+                    }
                 });
             };
+
             (item.components || []).forEach(c => { if(!HIDDEN_RESOURCES.includes(c.name)) scan(c.drops, c.name); });
             scan(item.drops, "MAIN BP");
 
@@ -143,35 +159,23 @@ export default function WarframeDetailModal({ item, onClose, ownedItems, onToggl
 
             if (neededIDs.size === 0) { setLoadingStrategies(false); return; }
 
-            // Carichiamo DUE file:
-            // 1. RelicLookup.json per le missioni (già fatto)
-            // 2. Relics.json (NUOVO) per avere le immagini corrette!
-            
             const [lookupRes, relicsRes] = await Promise.all([
                 fetch(`${API_BASE_URL}/RelicLookup.json`),
                 fetch(`${API_BASE_URL}/Relics.json`)
             ]);
 
-            if (!lookupRes.ok) throw new Error("Missing Lookup DB");
-            const lookupDB = await lookupRes.json();
+            let lookupDB = {};
+            if (lookupRes.ok) lookupDB = await lookupRes.json();
             
-            // Creiamo una mappa rapida per le immagini dalle Reliquie complete
             let imageMap = {};
             if (relicsRes.ok) {
                 const relicsArr = await relicsRes.json();
                 relicsArr.forEach(r => {
-                    // Normalizziamo il nome per matchare "LITH G1"
                     const stdName = getStandardID(r.name);
-                    if (stdName && r.imageName) {
-                        imageMap[stdName] = r.imageName;
-                    }
+                    if (stdName && r.imageName) imageMap[stdName] = r.imageName;
                 });
             }
-
-            // Uniamo i dati: salviamo le missioni E la mappa immagini nello state
-            // Possiamo "sporcare" lookupData aggiungendo una proprietà speciale _images
             lookupDB._images = imageMap;
-            
             setLookupData(lookupDB); 
 
             const initialStrategies = calculateMissionsStrategy(neededIDs, lookupDB, relicToPartMap);
@@ -180,11 +184,9 @@ export default function WarframeDetailModal({ item, onClose, ownedItems, onToggl
         } catch (e) { console.error(e); setStatusMsg("N/A"); } finally { setLoadingStrategies(false); }
     }
 
-    // --- LOGICA FORMATTAZIONE COMPONENTI E VAULT STATUS ---
     function formatDropsWithVaultCheck(drops) {
         if(!drops || drops.length === 0) return [];
         const unique = new Map();
-        
         drops.forEach(d => {
             let locRaw = d.location || "";
             let isRelic = locRaw.toUpperCase().match(/(LITH|MESO|NEO|AXI|REQUIEM)\s+[A-Z0-9]+/);
@@ -197,36 +199,28 @@ export default function WarframeDetailModal({ item, onClose, ownedItems, onToggl
 
             if (isRelic) {
                 relicID = getStandardID(loc);
-                
-                // 1. TENTA DI RECUPERARE L'IMMAGINE DAL DB CARICATO (Metodo Affidabile)
                 if (lookupData && lookupData._images && lookupData._images[relicID]) {
                     imagePath = `${IMG_BASE_URL}/${lookupData._images[relicID]}`;
                 } else {
-                    // 2. FALLBACK: Tenta lo slug (Metodo "Indovina", spesso errato ma meglio di niente)
                     const slug = loc.toLowerCase().replace(/ /g, '-') + '-relic.png';
                     imagePath = `${IMG_BASE_URL}/${slug}`;
                 }
                 
-                // CHECK VAULT: Se il DB è caricato e l'ID non c'è, è Vaulted
-                // Nota: lookupData._images non conta per il vault, controlliamo le missioni
-                if (lookupData && relicID && !lookupData[relicID]) {
-                    isVaultedRelic = true;
-                }
+                // CHECK VAULT: Se la singola reliquia non ha drop, la segnamo come vaulted (icona V)
+                if (lookupData && relicID && !lookupData[relicID]) isVaultedRelic = true;
             }
 
             if(!unique.has(loc)) {
                 unique.set(loc, {
                     loc, isRelic, imagePath, relicID, isVaultedRelic,
                     pct: isRelic ? getIntactChance(d.rarity) : (d.chance ? `${(d.chance*100).toFixed(0)}%` : "-"),
-                    rarityClass: getRarityClass(d.rarity), // Classe CSS per colore %
+                    rarityClass: getRarityClass(d.rarity),
                     chance: d.chance || 0
                 });
             }
         });
-
-        // ORDINAMENTO: Prima le disponibili, poi le vaulted, poi per chance
         return Array.from(unique.values()).sort((a, b) => {
-            if (a.isVaultedRelic !== b.isVaultedRelic) return a.isVaultedRelic ? 1 : -1; // False (Available) first
+            if (a.isVaultedRelic !== b.isVaultedRelic) return a.isVaultedRelic ? 1 : -1; 
             return b.chance - a.chance;
         });
     }
@@ -245,6 +239,7 @@ export default function WarframeDetailModal({ item, onClose, ownedItems, onToggl
                         <h2 className="modal-title">{item.name}</h2>
                         <div className="type-pill">{item.type}</div>
                     </div>
+                    {/* USO LO STATO CALCOLATO NELLA LISTA O DAL JSON */}
                     {isVaulted ? <div className="vault-badge is-vaulted">VAULTED</div> : <div className="vault-badge is-available">AVAILABLE</div>}
                 </div>
 
@@ -286,7 +281,6 @@ export default function WarframeDetailModal({ item, onClose, ownedItems, onToggl
                                         <div className="relic-cards-grid">
                                             {formatDropsWithVaultCheck(comp.drops).map((d, i) => {
                                                 const isSelected = d.relicID && selectedRelics.has(d.relicID);
-                                                
                                                 return (
                                                     <div 
                                                         key={i} 
@@ -298,25 +292,9 @@ export default function WarframeDetailModal({ item, onClose, ownedItems, onToggl
                                                                 src={d.imagePath} 
                                                                 className="relic-card-img" 
                                                                 alt="" 
-                                                                // Se l'immagine fallisce, nascondila e mostra l'icona SVG (il fratello successivo nel DOM)
-                                                                onError={(e)=>{e.target.style.display='none'; e.target.nextSibling.style.display='block'}} 
+                                                                onError={(e)=>{e.target.style.display='none';}} 
                                                             />
                                                         ) : null}
-                                                        
-                                                        {/* Fallback Icona: Mostrata se non c'è imagePath O se l'immagine va in errore (gestito sopra) */}
-                                                        <svg 
-                                                            className="relic-icon-svg" 
-                                                            viewBox="0 0 24 24" 
-                                                            style={{display: (d.isRelic && d.imagePath) ? 'block' : 'block'}} // Modificato: Lasciamo che onError gestisca la visibilità
-                                                        >
-                                                            {/* Nota: Per evitare che si vedano entrambi prima del caricamento, meglio usare CSS o stato, ma questo è un fix rapido */}
-                                                            {d.isRelic ? (
-                                                                <path d="M14.5 2C13.5 2 12.5 2.5 12 3.5C11.5 2.5 10.5 2 9.5 2C6 2 4 5 4 8C4 11 6 13 8 16C9 17.5 10 19.5 10 22H14C14 19.5 15 17.5 16 16C18 13 20 11 20 8C20 5 18 2 14.5 2ZM12 17C10.5 15 9 13.5 9 11C9 9.5 10 8.5 12 8.5C14 8.5 15 9.5 15 11C15 13.5 13.5 15 12 17Z" />
-                                                            ) : (
-                                                                <path d="M12 2L2 12l10 10 10-10L12 2zm0 18l-8-8 8-8 8 8-8 8z"/>
-                                                            )}
-                                                        </svg>
-
                                                         <div className="card-info">
                                                             <span className="card-name">{d.loc}</span>
                                                             <span className={`card-pct ${d.rarityClass}`}>
@@ -353,7 +331,7 @@ export default function WarframeDetailModal({ item, onClose, ownedItems, onToggl
                                         <table className="mission-relics-table">
                                             <thead>
                                                 <tr>
-                                                    <th style={{width:'30%'}}>RELIC</th>
+                                                    <th style={{width:'30%'}}>SOURCE</th>
                                                     <th style={{width:'20%', textAlign:'center'}}>PART</th>
                                                     <th style={{width:'20%', textAlign:'center'}}>ROT</th>
                                                     <th style={{width:'30%', textAlign:'right'}}>CHANCE</th>
@@ -362,7 +340,7 @@ export default function WarframeDetailModal({ item, onClose, ownedItems, onToggl
                                             <tbody>
                                                 {mission.relicsFound.sort((a,b)=>b.maxChance - a.maxChance).map((r, i) => (
                                                     <tr key={i}>
-                                                        <td style={{color:'#fff', fontWeight:'bold'}}>{r.id}</td>
+                                                        <td style={{color:'#fff', fontWeight:'bold'}}>{r.id === "DROP" ? "DIRECT" : r.id}</td>
                                                         <td style={{textAlign:'center'}}><span className="part-badge">{r.part}</span></td>
                                                         <td style={{textAlign:'center', color:'var(--gold)'}}>{(r.drops||[]).map(d=>d.rot).join(' | ')}</td>
                                                         <td style={{textAlign:'right', color:'#aaa'}}>{(r.drops||[]).map(d=>(d.chance*100).toFixed(1)+'%').join(' | ')}</td>
@@ -375,7 +353,7 @@ export default function WarframeDetailModal({ item, onClose, ownedItems, onToggl
                             </div>
                         ) : (
                             <div style={{textAlign:'center', padding:'40px', color:'#555', fontStyle:'italic'}}>
-                                {!loadingStrategies && (selectedRelics.size > 0 ? "Selected relics are Vaulted or have no drop data." : "No farming data available.")}
+                                {!loadingStrategies && (selectedRelics.size > 0 ? "Selected relics are Vaulted or have no drop data." : "No farming data available. This item is likely Vaulted.")}
                             </div>
                         )}
                     </div>

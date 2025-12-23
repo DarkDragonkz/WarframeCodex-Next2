@@ -5,8 +5,6 @@ import CodexCard from './CodexCard';
 import WarframeDetailModal from './WarframeDetailModal';
 import { useOwnedItems } from '@/hooks/useOwnedItems';
 import { API_BASE_URL } from '@/utils/constants';
-
-// *** CARICA STILE HUD ***
 import '@/app/hud-layout.css'; 
 
 function CodexContent({ filesToLoad = [], pageTitle, customCategories = null, manualData = null }) {
@@ -17,7 +15,7 @@ function CodexContent({ filesToLoad = [], pageTitle, customCategories = null, ma
     const searchParams = useSearchParams();
     const router = useRouter();
     const pathname = usePathname();
-    const { ownedCards, toggleOwned } = useOwnedItems(); // RIMOSSO importItems
+    const { ownedCards, toggleOwned } = useOwnedItems();
     const [selectedItem, setSelectedItem] = useState(null);
 
     const defaultCat = customCategories ? customCategories[0].id : 'all';
@@ -25,10 +23,8 @@ function CodexContent({ filesToLoad = [], pageTitle, customCategories = null, ma
     const [activeSubFilter, setActiveSubFilter] = useState('all');
     const [searchTerm, setSearchTerm] = useState("");
     
-    // STATI FILTRI
     const [showMissingOnly, setShowMissingOnly] = useState(false);
     const [hideVaulted, setHideVaulted] = useState(false);
-    
     const [visibleCount, setVisibleCount] = useState(60);
 
     const activeConfig = customCategories ? customCategories.find(c => c.id === subCategory) : null;
@@ -40,14 +36,10 @@ function CodexContent({ filesToLoad = [], pageTitle, customCategories = null, ma
             setErrorMsg(null);
             
             if (manualData && manualData.length > 0) {
+                 // Gestione dati manuali (semplificata)
                  const processed = manualData
                     .filter(i => i && !i.uniqueName.includes("RANDOM") && i.imageName) 
-                    .map(item => ({
-                        ...item,
-                        maxRank: item.fusionLimit || item.maxLevel || 30,
-                        baseDrain: item.baseDrain || 0,
-                        polarityIcon: item.polarity ? `https://warframe.fandom.com/wiki/File:Polarity_${item.polarity.charAt(0).toUpperCase() + item.polarity.slice(1)}.png` : null 
-                    }));
+                    .map(item => ({ ...item, maxRank: item.fusionLimit || item.maxLevel || 30 }));
                 const uniqueItems = Array.from(new Map(processed.map(item => [item.name, item])).values());
                 uniqueItems.sort((a, b) => a.name.localeCompare(b.name));
                 setRawApiData(uniqueItems);
@@ -58,28 +50,60 @@ function CodexContent({ filesToLoad = [], pageTitle, customCategories = null, ma
             try {
                 if (filesToLoad.length === 0) { setLoading(false); return; }
 
-                const promises = filesToLoad.map(f => 
-                    fetch(`${API_BASE_URL}/${f}`)
-                        .then(res => {
-                            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                            return res.json();
-                        })
-                        .catch(err => {
-                            console.warn(`Skipping ${f}`, err);
-                            return [];
-                        })
-                );
+                // 1. SCARICA I DATI PRINCIPALI (Warframes.json ecc) E IL LOOKUP RELIQUIE IN PARALLELO
+                const [dataResults, lookupRes] = await Promise.all([
+                    Promise.all(filesToLoad.map(f => fetch(`${API_BASE_URL}/${f}`).then(r => r.json()))),
+                    fetch(`${API_BASE_URL}/RelicLookup.json`).then(r => r.ok ? r.json() : null)
+                ]);
 
-                const results = await Promise.all(promises);
-                const merged = results.flat();
+                // Creiamo un Set delle reliquie attive per fare controlli veloci
+                const activeRelicsSet = new Set(lookupRes ? Object.keys(lookupRes) : []);
+
+                const merged = dataResults.flat();
+                
+                // 2. PROCESSA E CORREGGI I DATI
                 const processed = merged
                     .filter(i => i && !i.uniqueName.includes("RANDOM") && i.imageName) 
-                    .map(item => ({
-                        ...item,
-                        maxRank: item.fusionLimit || item.maxLevel || 30,
-                        baseDrain: item.baseDrain || 0,
-                        polarityIcon: item.polarity ? `https://warframe.fandom.com/wiki/File:Polarity_${item.polarity.charAt(0).toUpperCase() + item.polarity.slice(1)}.png` : null 
-                    }));
+                    .map(item => {
+                        // --- LOGICA SMART VAULTED ---
+                        let computedVaulted = !!item.vaulted; // Partiamo dal JSON
+
+                        // Se è un PRIME, verifichiamo se è VERAMENTE farmabile
+                        if (item.name.includes('Prime') && lookupRes) {
+                            // Cerca le reliquie nei componenti
+                            const relicNames = [];
+                            if (item.components) {
+                                item.components.forEach(c => {
+                                    if(c.drops) c.drops.forEach(d => {
+                                        const match = d.location.toUpperCase().match(/(LITH|MESO|NEO|AXI|REQUIEM)\s+([A-Z0-9]+)/);
+                                        if (match) relicNames.push(`${match[1]} ${match[2]}`);
+                                    });
+                                });
+                            }
+                            
+                            // Se ha componenti Prime MA nessuna delle sue reliquie è nel file attivo -> È VAULTED
+                            // (Nota: se relicNames è vuoto, potrebbe essere un Prime Access esclusivo o buggato, nel dubbio ci fidiamo del JSON)
+                            if (relicNames.length > 0) {
+                                const hasActiveRelic = relicNames.some(r => activeRelicsSet.has(r));
+                                if (!hasActiveRelic) {
+                                    computedVaulted = true; // Forza Vaulted se nessuna reliquia è attiva
+                                } else {
+                                    // Se ha reliquie attive, è Available (corregge eventuali errori del JSON)
+                                    computedVaulted = false; 
+                                }
+                            }
+                        }
+                        // --- FINE LOGICA SMART ---
+
+                        return {
+                            ...item,
+                            vaulted: computedVaulted, // Sovrascriviamo con il dato calcolato
+                            maxRank: item.fusionLimit || item.maxLevel || 30,
+                            baseDrain: item.baseDrain || 0,
+                            polarityIcon: item.polarity ? `https://warframe.fandom.com/wiki/File:Polarity_${item.polarity.charAt(0).toUpperCase() + item.polarity.slice(1)}.png` : null 
+                        };
+                    });
+
                 const uniqueItems = Array.from(new Map(processed.map(item => [item.name, item])).values());
                 uniqueItems.sort((a, b) => a.name.localeCompare(b.name));
                 
@@ -125,7 +149,7 @@ function CodexContent({ filesToLoad = [], pageTitle, customCategories = null, ma
             <div className="header-group">
                 <div className="nav-top-row">
                     <div className="nav-brand">
-                        <a href="/" className="nav-home-btn">⌂ DASHBOARD</a>
+                        <a href="/" className="nav-home-btn">⌂ HOME</a>
                         <h1 className="page-title">{pageTitle}</h1>
                     </div>
                     <div className="stats-right">
@@ -166,15 +190,11 @@ function CodexContent({ filesToLoad = [], pageTitle, customCategories = null, ma
                          <div className="search-wrapper">
                             <input type="text" className="search-input" placeholder="SEARCH..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value.toLowerCase())} />
                         </div>
-                        
-                        {/* CHECKBOX HIDE VAULTED */}
                         <label className="toggle-filter">
                             <input type="checkbox" style={{display:'none'}} checked={hideVaulted} onChange={(e) => setHideVaulted(e.target.checked)} />
                             <div className="checkbox-custom">{hideVaulted && '✓'}</div>
                             HIDE VAULTED
                         </label>
-
-                        {/* CHECKBOX MISSING */}
                         <label className="toggle-filter">
                             <input type="checkbox" style={{display:'none'}} checked={showMissingOnly} onChange={(e) => setShowMissingOnly(e.target.checked)} />
                             <div className="checkbox-custom">{showMissingOnly && '✓'}</div>
