@@ -249,17 +249,17 @@ function ModCard({ item, isOwned, onToggle }) {
         
         // Mappa i nomi che arrivano dall'API ai nomi dei file che hai tu
         const map = {
-            'madurai': 'madurai.png',
-            'naramon': 'naramon.png',
-            'vazarin': 'vazarin.png',
-            'zenurik': 'zenurik.png',
-            'unairu': 'unairu.png',
-            'penjaga': 'penjaga.png', // Assicurati di avere questo file! Altrimenti usa 'Precept.svg' se lo hai rinominato
-            'universal': 'any.png',   // Questo è quello per "universal"
-            'umbra': 'umbra.png'
+            'madurai': 'madurai.svg',
+            'naramon': 'naramon.svg',
+            'vazarin': 'vazarin.svg',
+            'zenurik': 'zenurik.svg',
+            'unairu': 'unairu.svg',
+            'penjaga': 'penjaga.svg', // Assicurati di avere questo file! Altrimenti usa 'Precept.svg' se lo hai rinominato
+            'universal': 'any.svg',   // Questo è quello per "universal"
+            'umbra': 'umbra.svg'
         };
 
-        const fileName = map[p] || (p.charAt(0).toUpperCase() + p.slice(1) + '.png'); // Fallback: Capitalize
+        const fileName = map[p] || (p.charAt(0).toUpperCase() + p.slice(1) + '.svg'); // Fallback: Capitalize
         return `/polarities/${fileName}`;
     };
 
