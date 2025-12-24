@@ -18,17 +18,24 @@ export default function RelicsClientPage({ initialData = [] }) {
     const [currentEra, setCurrentEra] = useState('all'); 
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
-    const [showMissingOnly, setShowMissingOnly] = useState(false);
     
-    // LOGICA SHOW VAULTED (Default: False = Nascondi Vaulted)
+    // NUOVO FILTRO 3 STATI
+    const [filterState, setFilterState] = useState('all');
+    
     const [showVaulted, setShowVaulted] = useState(false);
-    
     const [selectedItem, setSelectedItem] = useState(null);
 
     useEffect(() => {
         const timer = setTimeout(() => { setDebouncedSearch(searchTerm); }, 300);
         return () => clearTimeout(timer);
     }, [searchTerm]);
+
+    // Ciclo Stati
+    const cycleFilterState = () => {
+        if (filterState === 'all') setFilterState('missing');
+        else if (filterState === 'missing') setFilterState('owned');
+        else setFilterState('all');
+    };
 
     useEffect(() => {
         if(initialData && initialData.length > 0) {
@@ -71,12 +78,17 @@ export default function RelicsClientPage({ initialData = [] }) {
     const filteredData = useMemo(() => {
         return rawApiData.filter(item => {
             if (debouncedSearch && !item.simpleName.toLowerCase().includes(debouncedSearch)) return false;
-            if (showMissingOnly && ownedCards.has(item.uniqueName)) return false;
+            
+            // LOGICA 3 STATI
+            const isOwned = ownedCards.has(item.uniqueName);
+            if (filterState === 'missing' && isOwned) return false;
+            if (filterState === 'owned' && !isOwned) return false;
+
             if (!showVaulted && item.isVaulted) return false;
             if (currentEra !== 'all' && item.era !== currentEra) return false;
             return true;
         });
-    }, [rawApiData, currentEra, debouncedSearch, showMissingOnly, showVaulted, ownedCards]);
+    }, [rawApiData, currentEra, debouncedSearch, filterState, showVaulted, ownedCards]);
 
     const toggleOwned = (id) => {
         const newSet = new Set(ownedCards);
@@ -137,11 +149,15 @@ export default function RelicsClientPage({ initialData = [] }) {
                             SHOW VAULTED
                         </label>
 
-                        <label className="toggle-filter">
-                            <input type="checkbox" style={{display:'none'}} checked={showMissingOnly} onChange={(e) => setShowMissingOnly(e.target.checked)} />
-                            <div className="checkbox-custom">{showMissingOnly && '✓'}</div>
-                            MISSING
-                        </label>
+                        {/* NUOVO BOTTONE CICLICO */}
+                        <button 
+                            className={`cycle-btn state-${filterState}`} 
+                            onClick={cycleFilterState}
+                        >
+                            {filterState === 'all' && 'SHOW: ALL'}
+                            {filterState === 'missing' && 'SHOW: MISSING'}
+                            {filterState === 'owned' && 'SHOW: OWNED'}
+                        </button>
                     </div>
                 </div>
                 <div className="progress-line-container"><div className="progress-line-fill" style={{width: `${pct}%`}}></div></div>
@@ -183,7 +199,6 @@ export default function RelicsClientPage({ initialData = [] }) {
     );
 }
 
-// --- CARD AVANZATA (PULITA) ---
 function RelicCardAdvanced({ item, isOwned, onToggle }) {
     return (
         <div 
@@ -191,29 +206,16 @@ function RelicCardAdvanced({ item, isOwned, onToggle }) {
             data-era={item.era}
         >
             <div className="relic-era-bar"></div>
-            
             <div className="relic-check" onClick={(e) => { e.stopPropagation(); onToggle(); }}>
                 {isOwned ? '✓' : ''}
             </div>
-
             <div className="relic-img-wrapper">
-                <Image 
-                    src={`${IMG_BASE_URL}/${item.imageName}`} 
-                    alt={item.name} 
-                    fill
-                    className="relic-img"
-                    unoptimized
-                />
+                <Image src={`${IMG_BASE_URL}/${item.imageName}`} alt={item.name} fill className="relic-img" unoptimized />
             </div>
-
             <div className="relic-info">
                 <div className="relic-era-label">{item.era}</div>
                 <div className="relic-code">{item.code}</div>
-                
-                {/* MOSTRA SOLO SE VAULTED */}
-                {item.isVaulted && (
-                    <div className="relic-vaulted-label">VAULTED</div>
-                )}
+                {item.isVaulted && (<div className="relic-vaulted-label">VAULTED</div>)}
             </div>
         </div>
     );

@@ -1,27 +1,41 @@
-// Questo file contiene le funzioni di filtro.
-// Viene importato SOLO dai Client Components.
+// src/utils/clientCategories.js
 
 export const CATEGORY_CONFIGS = {
     'warframes': [
         {
             id: 'all', label: 'ALL',
-            filter: (item) => (item.type || "").toLowerCase().includes('warframe') && 
-                              item.category === 'Warframes' &&
-                              !item.name.toLowerCase().includes('necramech')
+            filter: (item) => {
+                const type = (item.type || "").toLowerCase();
+                const name = item.name.toLowerCase();
+                return type.includes('warframe') && 
+                       item.category === 'Warframes' &&
+                       !name.includes('necramech') &&
+                       !type.includes('necramech');
+            }
         },
         {
             id: 'base', label: 'BASE',
-            filter: (item) => (item.type || "").toLowerCase().includes('warframe') && 
-                              item.category === 'Warframes' && 
-                              !item.name.includes('Prime') &&
-                              !item.name.toLowerCase().includes('necramech')
+            filter: (item) => {
+                const type = (item.type || "").toLowerCase();
+                const name = item.name.toLowerCase();
+                return type.includes('warframe') && 
+                       item.category === 'Warframes' && 
+                       !item.name.includes('Prime') &&
+                       !name.includes('necramech') &&
+                       !type.includes('necramech');
+            }
         },
         {
             id: 'prime', label: 'PRIME',
-            filter: (item) => (item.type || "").toLowerCase().includes('warframe') && 
-                              item.category === 'Warframes' && 
-                              item.name.includes('Prime') &&
-                              !item.name.toLowerCase().includes('necramech')
+            filter: (item) => {
+                const type = (item.type || "").toLowerCase();
+                const name = item.name.toLowerCase();
+                return type.includes('warframe') && 
+                       item.category === 'Warframes' && 
+                       item.name.includes('Prime') &&
+                       !name.includes('necramech') &&
+                       !type.includes('necramech');
+            }
         }
     ],
     'primary': [

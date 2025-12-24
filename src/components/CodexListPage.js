@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import CodexCard from './CodexCard';
 import dynamic from 'next/dynamic';
 import { useOwnedItems } from '@/hooks/useOwnedItems';
@@ -33,19 +32,24 @@ function CodexContent({ pageTitle, categoryMode, initialData = [], lookupData = 
     const [searchTerm, setSearchTerm] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
 
-    const [showMissingOnly, setShowMissingOnly] = useState(false);
+    // NUOVO STATO FILTRO: 'all' | 'missing' | 'owned'
+    const [filterState, setFilterState] = useState('all');
     
-    // NUOVA LOGICA: showVaulted (False di default = Vaulted Nascosti)
     const [showVaulted, setShowVaulted] = useState(false);
 
     const activeConfig = customCategories ? customCategories.find(c => c.id === subCategory) : null;
 
     useEffect(() => {
-        const timer = setTimeout(() => {
-            setDebouncedSearch(searchTerm);
-        }, 300);
+        const timer = setTimeout(() => { setDebouncedSearch(searchTerm); }, 300);
         return () => clearTimeout(timer);
     }, [searchTerm]);
+
+    // Ciclo Stati Filtro: ALL -> MISSING -> OWNED -> ALL
+    const cycleFilterState = () => {
+        if (filterState === 'all') setFilterState('missing');
+        else if (filterState === 'missing') setFilterState('owned');
+        else setFilterState('all');
+    };
 
     useEffect(() => {
         if (initialData) {
@@ -55,7 +59,6 @@ function CodexContent({ pageTitle, categoryMode, initialData = [], lookupData = 
                 .filter(i => i && !i.uniqueName.includes("RANDOM") && i.imageName) 
                 .map(item => {
                     let computedVaulted = !!item.vaulted; 
-
                     if (item.name.includes('Prime') && lookupData) {
                         const relicNames = [];
                         if (item.components) {
@@ -66,14 +69,12 @@ function CodexContent({ pageTitle, categoryMode, initialData = [], lookupData = 
                                 });
                             });
                         }
-                        
                         if (relicNames.length > 0) {
                             const hasActiveRelic = relicNames.some(r => activeRelicsSet.has(r));
                             if (!hasActiveRelic) computedVaulted = true; 
                             else computedVaulted = false; 
                         }
                     }
-
                     return {
                         ...item,
                         vaulted: computedVaulted, 
@@ -85,7 +86,6 @@ function CodexContent({ pageTitle, categoryMode, initialData = [], lookupData = 
 
             const uniqueItems = Array.from(new Map(processed.map(item => [item.name, item])).values());
             uniqueItems.sort((a, b) => a.name.localeCompare(b.name));
-            
             setRawApiData(uniqueItems);
             setLoading(false);
         }
@@ -94,9 +94,12 @@ function CodexContent({ pageTitle, categoryMode, initialData = [], lookupData = 
     const processedData = useMemo(() => {
         return rawApiData.filter(item => {
             if (debouncedSearch && !item.name.toLowerCase().includes(debouncedSearch)) return false;
-            if (showMissingOnly && ownedCards.has(item.uniqueName)) return false;
             
-            // LOGICA INVERTITA: Se NON voglio vedere i vaulted (default) E l'item è vaulted -> Nascondi
+            // LOGICA 3 STATI
+            const isOwned = ownedCards.has(item.uniqueName);
+            if (filterState === 'missing' && isOwned) return false; // Mostra solo mancanti
+            if (filterState === 'owned' && !isOwned) return false;  // Mostra solo posseduti
+
             if (!showVaulted && item.vaulted) return false;
             
             if (activeConfig && activeConfig.filter && !activeConfig.filter(item)) return false;
@@ -106,7 +109,7 @@ function CodexContent({ pageTitle, categoryMode, initialData = [], lookupData = 
             }
             return true;
         });
-    }, [rawApiData, subCategory, activeSubFilter, debouncedSearch, showMissingOnly, showVaulted, ownedCards, activeConfig]);
+    }, [rawApiData, subCategory, activeSubFilter, debouncedSearch, filterState, showVaulted, ownedCards, activeConfig]);
 
     const handleCategoryChange = (id) => {
         const p = new URLSearchParams(searchParams.toString());
@@ -166,18 +169,21 @@ function CodexContent({ pageTitle, categoryMode, initialData = [], lookupData = 
                             <input type="text" className="search-input" placeholder="SEARCH..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value.toLowerCase())} />
                         </div>
                         
-                        {/* CHECKBOX SHOW VAULTED */}
                         <label className="toggle-filter">
                             <input type="checkbox" style={{display:'none'}} checked={showVaulted} onChange={(e) => setShowVaulted(e.target.checked)} />
                             <div className="checkbox-custom">{showVaulted && '✓'}</div>
                             SHOW VAULTED
                         </label>
 
-                        <label className="toggle-filter">
-                            <input type="checkbox" style={{display:'none'}} checked={showMissingOnly} onChange={(e) => setShowMissingOnly(e.target.checked)} />
-                            <div className="checkbox-custom">{showMissingOnly && '✓'}</div>
-                            MISSING
-                        </label>
+                        {/* NUOVO BOTTONE CICLICO */}
+                        <button 
+                            className={`cycle-btn state-${filterState}`} 
+                            onClick={cycleFilterState}
+                        >
+                            {filterState === 'all' && 'SHOW: ALL'}
+                            {filterState === 'missing' && 'SHOW: MISSING'}
+                            {filterState === 'owned' && 'SHOW: OWNED'}
+                        </button>
                     </div>
                 </div>
                 <div className="progress-line-container"><div className="progress-line-fill" style={{width: `${pct}%`}}></div></div>
