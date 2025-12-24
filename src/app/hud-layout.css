@@ -11,7 +11,7 @@
 .header-group {
   flex-shrink: 0; 
   background: #0a0a0c; 
-  z-index: 100; /* Z-Index alto per stare sopra */
+  z-index: 40; /* Z-Index alto per stare sopra */
   border-bottom: 1px solid rgba(255,255,255,0.05);
   box-shadow: 0 10px 30px rgba(0,0,0,0.8); 
   display: flex; flex-direction: column;
