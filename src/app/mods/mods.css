@@ -138,3 +138,7 @@
     font-weight: 700; text-transform: uppercase; display: block; cursor: pointer;
 }
 .mod-wiki-btn:hover { color: var(--gold); background: #222; }
+.mod-card-wrapper {
+    content-visibility: auto;
+    contain-intrinsic-size: 340px; /* Altezza stimata della Mod card */
+}

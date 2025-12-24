@@ -140,3 +140,7 @@
 .wiki-btn-block:hover { 
   color: #fff; border-color: #666; background: #1a1a1e; 
 }
+.card-wrapper {
+  content-visibility: auto;
+  contain-intrinsic-size: 400px; /* Altezza stimata della card */
+}

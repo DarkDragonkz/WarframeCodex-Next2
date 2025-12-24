@@ -21,14 +21,18 @@ export function useOwnedItems() {
         setIsLoaded(true);
     }, []);
 
-    // Salva dati ad ogni modifica
+    // OTTIMIZZAZIONE PUNTO 4: Debounce del salvataggio
     useEffect(() => {
-        if (isLoaded) {
+        if (!isLoaded) return;
+
+        // Aspetta 1 secondo di inattività prima di scrivere su disco
+        const handler = setTimeout(() => {
             localStorage.setItem(STORAGE_KEY, JSON.stringify([...ownedCards]));
-        }
+        }, 1000);
+
+        return () => clearTimeout(handler);
     }, [ownedCards, isLoaded]);
 
-    // Funzione ottimizzata per toggle
     const toggleOwned = useCallback((id) => {
         setOwnedCards(prev => {
             const newSet = new Set(prev);
@@ -38,7 +42,6 @@ export function useOwnedItems() {
         });
     }, []);
 
-    // Funzione per import massivo (es. da file JSON)
     const importItems = useCallback((itemsArray, rawData) => {
         setOwnedCards(prev => {
             const newSet = new Set(prev);
