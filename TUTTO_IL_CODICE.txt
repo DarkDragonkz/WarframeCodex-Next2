@@ -1,4 +1,4 @@
-DATA DUMP: 2025-12-24T02:12:12.249Z
+DATA DUMP: 2025-12-24T02:29:24.818Z
 
 
 
@@ -93,19 +93,29 @@ div::-webkit-scrollbar-thumb:hover { background: #555; }
 FILE: src\app\homepage.css
 ==================================================
 
+/* src/app/homepage.css */
+
 /* LAYOUT BASE */
 .landing-page {
-  height: 100vh; width: 100vw;
+  /* 100dvh gestisce meglio le barre di indirizzo mobili (Safari/Chrome) */
+  height: 100vh;
+  height: 100dvh; 
+  width: 100vw;
   background: #050505;
-  position: relative; 
-  display: flex; flex-direction: column; 
-  align-items: center; justify-content: center;
-  overflow: hidden; /* Blocca scroll pagina intera */
+  position: relative;
+  
+  /* SBLOCCO SCROLL */
+  overflow-y: auto; 
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch; /* Scroll fluido iOS */
+  
+  /* Reset del flex sul contenitore padre per evitare blocchi */
+  display: block; 
 }
 
-/* SFONDO TECNICO */
+/* SFONDO TECNICO (Fisso, non scrolla col contenuto) */
 .landing-page::before {
-  content: ""; position: absolute; inset: 0;
+  content: ""; position: fixed; inset: 0;
   background-image: 
     linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
@@ -116,94 +126,134 @@ FILE: src\app\homepage.css
 
 /* VIGNETTATURA AI BORDI */
 .landing-page::after {
-  content: ""; position: absolute; inset: 0;
+  content: ""; position: fixed; inset: 0;
   background: radial-gradient(circle at center, transparent 0%, #000 90%);
   z-index: 1; pointer-events: none;
 }
 
+/* CONTENITORE CONTENUTO */
 .landing-content {
   position: relative; z-index: 10;
-  width: 100%; height: 100%;
-  display: flex; flex-direction: column; 
-  align-items: center; justify-content: center;
+  width: 100%;
+  
+  /* FIX CRUCIALE: Permette al contenuto di crescere oltre lo schermo */
+  min-height: 100%; 
+  
+  /* FIX CRUCIALE: flex-start evita che il titolo venga tagliato fuori in alto */
+  display: flex; 
+  flex-direction: column; 
+  align-items: center; 
+  justify-content: flex-start; 
+
+  /* Spazio abbondante sopra e sotto per lo scroll */
+  padding: 80px 20px 60px 20px;
 }
 
 /* TITOLO E HEADER */
 .landing-header {
-  margin-bottom: 20px; /* Ridotto margine per dare spazio alle card */
+  margin-bottom: 40px; 
   text-align: center;
-  animation: fadeInDown 1s ease-out;
-  flex-shrink: 0; /* Impedisce che il titolo si schiacci */
+  flex-shrink: 0;
+  width: 100%;
+  /* Rimuoviamo animazioni complesse che potrebbero nascondere il titolo su mobile */
+  opacity: 1; 
+  transform: none;
 }
 
 .landing-title {
-  font-size: 60px; /* Leggermente più piccolo per stare nello schermo */
+  /* Font size responsivo e sicuro */
+  font-size: 42px; 
   font-weight: 900; 
-  color: #fff; text-transform: uppercase; 
-  letter-spacing: 10px; line-height: 1;
+  color: #fff; /* Colore base di fallback */
+  text-transform: uppercase; 
+  letter-spacing: 6px; 
+  line-height: 1.1;
   margin: 0;
-  background: linear-gradient(to bottom, #ffffff 0%, #888888 100%);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 0 20px rgba(255,255,255,0.1));
+  
+  /* Gradiente testo */
+  background: linear-gradient(to bottom, #ffffff 0%, #aaaaaa 100%);
+  -webkit-background-clip: text; 
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  
+  filter: drop-shadow(0 0 15px rgba(255,255,255,0.15));
+}
+
+@media (min-width: 768px) {
+  .landing-title {
+    font-size: 70px;
+    letter-spacing: 10px;
+  }
 }
 
 .landing-subtitle {
-  font-size: 12px; color: var(--gold); 
-  letter-spacing: 6px; text-transform: uppercase; 
-  margin-top: 10px; font-weight: 700;
+  font-size: 11px; color: var(--gold); 
+  letter-spacing: 4px; text-transform: uppercase; 
+  margin-top: 15px; font-weight: 700;
   text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
   display: flex; align-items: center; justify-content: center; gap: 15px;
+  text-align: center; line-height: 1.5;
 }
 .landing-subtitle::before, .landing-subtitle::after {
-  content: ""; height: 1px; width: 40px; background: var(--gold); opacity: 0.5;
+  content: ""; height: 1px; width: 30px; background: var(--gold); opacity: 0.5;
+  display: inline-block;
 }
 
-/* --- GRIGLIA CARDS (MODIFICATO PER FIT SCREEN) --- */
+/* GRIGLIA CARDS */
 .cards-scroll-container { 
-  width: 100%; 
-  /* Rimosso overflow-x e padding eccessivo */
+  width: 100%;
   display: flex; 
   justify-content: center;
-  align-items: center;
-  flex-grow: 1; /* Occupa lo spazio disponibile */
+  align-items: flex-start; /* Allineamento sicuro */
+  margin-bottom: 20px;
 }
 
 .cards-row { 
   display: flex; 
-  flex-wrap: wrap; /* FONDAMENTALE: Va a capo se non ci stanno */
+  flex-wrap: wrap;
   justify-content: center; 
-  gap: 20px; /* Spazio tra le card */
-  max-width: 1200px; /* Larghezza massima per forzare 4 per riga su schermi grandi */
-  padding: 0 20px;
+  gap: 15px; /* Gap ridotto per mobile */
+  max-width: 1200px; 
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .cards-row { gap: 20px; }
 }
 
 /* CARD MENU */
 .menu-card {
   flex: 0 0 auto; 
-  width: 200px; height: 280px; /* DIMENSIONI RIDOTTE PER STARE NELLO SCHERMO */
-  background: rgba(20, 20, 23, 0.4); 
+  width: 155px; height: 230px; /* Dimensioni ottimizzate per 2 colonne su mobile */
+  background: rgba(20, 20, 23, 0.6); /* Sfondo leggermente più scuro per contrasto */
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 4px;
   position: relative; overflow: hidden; 
   display: flex; flex-direction: column; justify-content: flex-end;
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  transition: transform 0.2s, box-shadow 0.2s;
   backdrop-filter: blur(4px); 
   text-decoration: none;
+  margin-bottom: 5px; /* Sicurezza spaziatura */
 }
 
-/* HOVER EFFECT */
+@media (min-width: 768px) {
+    .menu-card { width: 200px; height: 280px; }
+}
+
+/* INTERAZIONE CARD */
+.menu-card:active { transform: scale(0.96); } /* Feedback tocco su mobile */
 .menu-card:hover { 
-  transform: translateY(-5px) scale(1.05); 
+  transform: translateY(-5px) scale(1.02); 
   border-color: var(--card-color); 
-  box-shadow: 0 10px 30px -5px var(--card-glow); 
-  z-index: 10;
+  box-shadow: 0 5px 20px -5px var(--card-glow); 
+  z-index: 5;
 }
 
-/* IMMAGINE DI SFONDO CARD */
+/* VISUAL AREA */
 .card-visual-area { 
   position: absolute; inset: 0; z-index: 0; 
-  transition: 0.6s ease; 
-  filter: grayscale(100%) brightness(0.4) contrast(1.2);
+  transition: 0.6s ease;
+  filter: grayscale(100%) brightness(0.5) contrast(1.1);
 }
 .card-img-element { 
   width: 100%; height: 100%; object-fit: cover; 
@@ -211,51 +261,43 @@ FILE: src\app\homepage.css
 
 .menu-card:hover .card-visual-area { 
   filter: grayscale(0%) brightness(1.1) contrast(1); 
-  transform: scale(1.1);
+  transform: scale(1.05);
 }
 
-/* CONTENUTO TESTUALE CARD */
+/* CONTENUTO CARD TEXT */
 .card-content { 
   position: relative; z-index: 2; 
-  padding: 15px; 
-  background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.5) 60%, transparent 100%); 
-  width: 100%; border-top: 1px solid rgba(255,255,255,0.05);
+  padding: 12px;
+  background: linear-gradient(to top, rgba(0,0,0,0.95) 10%, rgba(0,0,0,0.6) 70%, transparent 100%); 
+  width: 100%; 
+  border-top: 1px solid rgba(255,255,255,0.05);
   transition: 0.3s;
 }
 .menu-card:hover .card-content {
-  background: linear-gradient(to top, var(--card-glow) 0%, rgba(0,0,0,0.8) 80%, transparent 100%);
   border-top-color: var(--card-color);
 }
 
 .card-title { 
-  font-size: 18px; /* Font leggermente ridotto */
-  font-weight: 900; 
+  font-size: 15px; font-weight: 800; 
   text-transform: uppercase; color: #fff; 
-  letter-spacing: 1px; margin-bottom: 2px; line-height: 1;
-  text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+  letter-spacing: 0.5px; margin-bottom: 3px; line-height: 1;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
 }
 .menu-card:hover .card-title { color: var(--card-color); }
 
 .card-sub { 
-  font-size: 9px; color: #aaa; 
-  text-transform: uppercase; letter-spacing: 2px; font-weight: 700;
+  font-size: 8px; color: #ccc; 
+  text-transform: uppercase; letter-spacing: 1px; font-weight: 700;
 }
 .menu-card:hover .card-sub { color: #fff; }
 
 /* FOOTER */
 .landing-footer {
-  margin-top: 20px; 
-  margin-bottom: 20px;
-  color: #444; font-size: 9px; 
-  text-transform: uppercase; letter-spacing: 3px; 
+  margin-top: 30px;
+  color: #555; font-size: 9px; 
+  text-transform: uppercase; letter-spacing: 2px; 
   font-family: monospace;
-  opacity: 0.7;
-}
-
-/* ANIMAZIONI */
-@keyframes fadeInDown {
-  from { opacity: 0; transform: translateY(-30px); }
-  to { opacity: 1; transform: translateY(0); }
+  text-align: center;
 }
 
 ==================================================
@@ -407,6 +449,100 @@ FILE: src\app\hud-layout.css
 .card-wrapper {
   content-visibility: auto;
   contain-intrinsic-size: 400px; /* Altezza stimata della card */
+}
+/* ... contenuto esistente ... */
+
+/* =========================================
+   MEDIA QUERIES PER MOBILE (HUD)
+   ========================================= */
+
+@media (max-width: 768px) {
+  /* Rimuove overflow: hidden per permettere lo scroll della pagina intera se serve,
+     anche se qui manteniamo la logica dello scroll interno */
+  .codex-layout {
+    height: 100dvh; /* Usa dynamic viewport height per mobile browser moderni */
+  }
+
+  /* Header: Riduciamo altezza e padding */
+  .nav-top-row {
+    padding: 0 15px;
+    height: 60px;
+  }
+
+  .nav-brand {
+    gap: 15px;
+  }
+
+  .page-title {
+    font-size: 20px; /* Titolo più piccolo */
+    padding-left: 10px;
+  }
+  
+  /* Nascondiamo le statistiche complete su mobile se non c'è spazio, 
+     oppure le riduciamo */
+  .stats-right {
+    gap: 10px;
+  }
+  .stat-box {
+    display: flex; flex-direction: column; align-items: flex-end;
+  }
+  .stat-label { font-size: 7px; }
+  .stat-value { font-size: 14px; }
+
+  /* Controlli (Filtri e Ricerca): Impilamento Verticale */
+  .controls-row {
+    flex-direction: column;
+    align-items: stretch; /* Allarga tutto a larghezza piena */
+    gap: 15px;
+    padding: 15px;
+    height: auto; /* Lascia che l'altezza si adatti */
+  }
+
+  /* I tab delle categorie devono essere scrollabili orizzontalmente */
+  .filters-left {
+    max-width: 100% !important;
+    overflow-x: auto;
+    padding-bottom: 5px; /* Spazio per scrollbar */
+  }
+  
+  .filters-right {
+    flex-direction: column; /* Impila input ricerca e checkbox */
+    gap: 10px;
+    width: 100%;
+  }
+
+  .search-wrapper, .search-input {
+    width: 100%; /* Barra di ricerca a larghezza piena */
+  }
+
+  .legend-box {
+    display: none; /* Nascondi la legenda su mobile per risparmiare spazio */
+  }
+
+  .toggle-filter {
+    width: 100%;
+    justify-content: flex-start; /* Allinea checkbox a sinistra */
+    padding: 5px 0;
+  }
+
+  /* Griglia Cards */
+  .gallery-scroll-area {
+    padding: 15px; /* Meno padding laterale */
+  }
+  
+  .card-gallery {
+    /* Riduciamo la dimensione minima delle card per farne stare 2 su schermi piccoli */
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 15px;
+  }
+
+  /* Adattamento Card */
+  .card-wrapper {
+    height: 320px !important; /* Card leggermente più basse */
+  }
+  .card-image-container {
+    height: 140px;
+  }
 }
 
 ==================================================
@@ -1854,111 +1990,186 @@ export default function CodexListPage(props) {
 FILE: src\components\WarframeDetailModal.css
 ==================================================
 
+/* src/components/WarframeDetailModal.css */
+
+/* SFONDO MODALE */
 .modal-overlay { 
-  position: fixed; inset: 0; background: rgba(0,0,0,0.95); backdrop-filter: blur(10px); 
-  z-index: 1000; display: flex; align-items: center; justify-content: center; 
+  position: fixed; inset: 0; 
+  background: rgba(0, 0, 0, 0.95); backdrop-filter: blur(10px); 
+  z-index: 2000; /* Z-Index altissimo */
+  display: flex; align-items: center; justify-content: center; 
+  padding: 20px;
 }
+
+/* CONTENITORE PRINCIPALE */
 .modal-content-simple { 
-  width: 95vw; height: 90vh; max-width: 1600px; background: #08080a; 
-  border: 1px solid #333; border-radius: 4px; overflow: hidden; position: relative; 
-  box-shadow: 0 0 100px rgba(0,0,0,0.9); display: flex; flex-direction: column;
+  width: 100%; max-width: 1600px; height: 90vh; 
+  background: #121214; border: 1px solid #333; border-top: 3px solid var(--gold);
+  display: flex; flex-direction: row; /* Desktop: Orizzontale */
+  overflow: hidden; position: relative; 
+  box-shadow: 0 0 50px #000; border-radius: 4px;
 }
-.close-btn { position: absolute; top: 20px; right: 25px; color: #fff; font-size: 28px; background: none; border: none; cursor: pointer; z-index: 20; opacity: 0.6; }
-.close-btn:hover { opacity: 1; color: var(--gold); }
 
-.modal-header-row { display: flex; justify-content: space-between; align-items: center; padding: 25px 70px 25px 35px; border-bottom: 1px solid #222; background: #0a0a0c; }
-.modal-title { font-size: 36px; font-weight: 900; color: #fff; text-transform: uppercase; letter-spacing: 1px; }
+/* PULSANTE CHIUSURA - Posizione assoluta ma sicura */
+.close-btn { 
+  position: absolute; top: 10px; right: 15px; 
+  color: #fff; font-size: 32px; background: rgba(0,0,0,0.6); 
+  border: 1px solid #444; border-radius: 50%;
+  width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; z-index: 3000; /* Sopra a tutto */
+  padding-bottom: 4px; /* Centratura visiva */
+}
+.close-btn:hover { color: var(--gold); border-color: var(--gold); background: #000; }
 
-/* BADGES HEADER (Available/Vaulted) - RIPRISTINATI */
-.vault-badge { font-size: 11px; padding: 6px 16px; border-radius: 2px; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; }
-.vault-badge.is-vaulted { background: rgba(255, 50, 50, 0.1); color: #ff5555; border: 1px solid rgba(255, 50, 50, 0.3); }
-.vault-badge.is-available { background: rgba(50, 255, 100, 0.05); color: #5fffa5; border: 1px solid rgba(50, 255, 100, 0.2); }
+.modal-header-row { display: none; } /* Nascondiamo header legacy */
+.modal-body { display: flex; width: 100%; height: 100%; }
 
-.modal-body { flex: 1; display: flex; overflow: hidden; padding: 0; text-align: left !important; }
-
-/* 3 COLONNE */
+/* --- STILI DESKTOP (3 COLONNE) --- */
 .col-left { 
-  width: 320px; flex-shrink: 0; padding: 30px; 
-  border-right: 1px solid #222; background: #050505 !important; 
-  display: flex; flex-direction: column; align-items: center; overflow-y: auto; 
+  flex: 0 0 320px; background: #0a0a0c; border-right: 1px solid #333; 
+  display: flex; flex-direction: column; padding: 30px; overflow-y: auto;
 }
 .col-center { 
-  flex: 1; padding: 30px; border-right: 1px solid #222; 
-  background: #0b0b0e !important; overflow-y: auto; 
+  flex: 0 0 35%; background: #121214; border-right: 1px solid #333; 
+  display: flex; flex-direction: column; overflow-y: auto;
 }
-.col-right { flex: 1.4; padding: 30px; background: #08080a; overflow-y: auto; }
-
-/* BOTTONE AGGIUNGI (STILE GOLD GRANDE) - RIPRISTINATO */
-.btn-toggle-large {
-  width: 100%; padding: 15px; margin-top: 25px;
-  background: var(--gold); color: #000; font-weight: 800; letter-spacing: 1px;
-  border: none; border-radius: 2px; cursor: pointer; text-transform: uppercase;
-  transition: 0.2s;
+.col-right { 
+  flex: 1; background: #0e0e10; display: flex; flex-direction: column; overflow-y: auto;
 }
-.btn-toggle-large:hover { background: #fff; box-shadow: 0 0 15px var(--gold-glow); }
-.btn-toggle-large.owned { background: #222; color: #fff; border: 1px solid #444; }
 
-/* MINI CARDS RELIQUIE */
-.relic-cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
-.mini-relic-card { 
-  background: #1a1a1d; border: 1px solid #333; border-radius: 4px; padding: 8px; 
-  display: flex; flex-direction: row; align-items: center; gap: 12px; 
-  transition: 0.2s; cursor: pointer; overflow: hidden; position: relative;
+/* CONTENUTI */
+.det-title { font-size: 32px; font-weight: 900; color: #fff; margin: 0; text-transform: uppercase; line-height: 1; }
+.det-subtitle { color: var(--gold); font-size: 14px; font-weight: bold; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
+
+.det-img-box { 
+    width: 100%; height: 300px; 
+    display: flex; align-items: center; justify-content: center; 
+    margin-bottom: 20px; position: relative;
 }
-.mini-relic-card:hover { border-color: #666; background: #222; transform: translateY(-2px); }
-.mini-relic-card.selected { border-color: var(--gold); background: rgba(212, 175, 55, 0.08); box-shadow: 0 0 10px rgba(212, 175, 55, 0.3); opacity: 1 !important; }
-.mini-relic-card.is-vaulted { opacity: 0.6; border-color: #3a2a2a; background: #141010; }
+.det-img-box img { 
+    max-width: 100%; max-height: 100%; 
+    object-fit: contain; /* Fondamentale per non tagliare l'immagine */
+    filter: drop-shadow(0 0 20px rgba(0,0,0,0.5)); 
+}
 
-/* IMMAGINE RELIQUIA */
-.relic-card-img { width: 32px; height: 32px; object-fit: contain; flex-shrink: 0; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
-.relic-icon-svg { width: 28px; height: 28px; fill: #444; flex-shrink: 0; } /* Fallback */
+.det-desc { font-size: 13px; color: #888; line-height: 1.5; margin-bottom: 20px; max-height: 200px; overflow-y: auto; }
 
-.card-info { display: flex; flex-direction: column; justify-content: center; overflow: hidden; flex: 1; }
-.card-name { font-size: 11px; color: #fff; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.card-pct { font-size: 10px; font-weight: 600; margin-top: 2px; display: flex; align-items: center; gap: 5px; }
+/* HEADER COLONNE */
+.col-header { 
+  padding: 15px 20px; background: #1a1a1e; border-bottom: 1px solid #333; 
+  font-size: 14px; font-weight: 800; color: #fff; letter-spacing: 1px; text-transform: uppercase;
+  display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
+}
+.col-scrollable { flex: 1; overflow-y: auto; padding: 20px; }
 
-/* RARITY COLORS (PERCENTUALI) */
-.pct-common { color: #cd7f32; }   /* Bronzo */
-.pct-uncommon { color: #c0c0c0; } /* Argento */
-.pct-rare { color: var(--gold); text-shadow: 0 0 5px rgba(212,175,55,0.4); } /* Oro */
-
-.section-title { color: var(--gold-dim); border-bottom: 1px solid #222; padding-bottom: 10px; margin-bottom: 20px; font-size: 13px; text-transform: uppercase; letter-spacing: 2px; font-weight: bold; }
-.warframe-description { font-size: 13px; color: #999; font-style: italic; line-height: 1.5; text-align: center; margin-bottom: 20px; padding: 0 10px; }
-.part-badge { display: inline-block; background: rgba(95, 255, 165, 0.08); border: 1px solid rgba(95, 255, 165, 0.2); color: var(--green-tech); padding: 2px 8px; border-radius: 3px; font-size: 9px; font-weight: 700; text-transform: uppercase; }
-.vaulted-mini-tag { font-size: 8px; color: var(--red-vault); background: rgba(255, 85, 85, 0.1); padding: 1px 4px; border-radius: 2px; margin-left: 6px; border: 1px solid rgba(255, 85, 85, 0.3); font-weight: 900; }
-
-.strategy-container { display: flex; flex-direction: column; gap: 15px; }
-.mission-block { background: #121215; border: 1px solid #2a2a2e; border-radius: 4px; padding: 0; overflow: hidden; margin-bottom: 15px; }
-.mission-block-header { background: #18181b; padding: 10px 15px; border-bottom: 1px solid #222; display: flex; justify-content: space-between; align-items: center; }
-.mission-name-large { font-size: 13px; font-weight: bold; color: #fff; }
-.mission-relics-table { width: 100%; border-collapse: collapse; }
-.mission-relics-table th { text-align: left; font-size: 9px; color: #555; padding: 8px 15px; background: #0e0e10; font-weight: bold; }
-.mission-relics-table td { padding: 10px 15px; border-bottom: 1px solid #1f1f22; font-size: 12px; vertical-align: middle; color: #bbb; }
+/* COMPONENTI & CARDS */
 .component-row { margin-bottom: 20px; }
 .component-header { display: flex; align-items: center; gap: 10px; background: #18181b; padding: 8px; border: 1px solid #333; margin-bottom: 8px; border-radius: 4px; }
-.component-icon { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; }
+.component-icon { width: 30px; height: 30px; position: relative; }
 .component-icon img { width: 100%; height: 100%; object-fit: contain; }
 .count-badge { font-size: 10px; background: #000; padding: 2px 6px; border-radius: 4px; border: 1px solid #333; color: #666; margin-left: auto; }
 
-/* ... stili precedenti ... */
+.relic-cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+.mini-relic-card { 
+  background: #1a1a1d; border: 1px solid #333; border-radius: 4px; padding: 8px; 
+  display: flex; flex-direction: row; align-items: center; gap: 10px; 
+  cursor: pointer; position: relative;
+}
+.mini-relic-card:hover { border-color: #666; background: #222; }
+.mini-relic-card.selected { border-color: var(--gold); background: rgba(212, 175, 55, 0.08); }
+.relic-card-img { width: 30px; height: 30px; object-fit: contain; }
+.card-info { display: flex; flex-direction: column; overflow: hidden; }
+.card-name { font-size: 11px; color: #fff; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-pct { font-size: 10px; font-weight: 600; }
+.pct-common { color: #cd7f32; }
+.pct-uncommon { color: #c0c0c0; }
+.pct-rare { color: var(--gold); text-shadow: 0 0 5px rgba(212,175,55,0.4); }
 
-/* MODALITÀ BASE: Nasconde la colonna di destra */
-.modal-content-simple.base-mode .col-right {
-    display: none;
-}
+.strategy-container { display: flex; flex-direction: column; gap: 15px; }
+.mission-block { background: #121215; border: 1px solid #2a2a2e; border-radius: 4px; overflow: hidden; }
+.mission-block-header { background: #18181b; padding: 10px 15px; border-bottom: 1px solid #222; display: flex; justify-content: space-between; align-items: center; }
+.mission-name-large { font-size: 13px; font-weight: bold; color: #fff; }
+.mission-relics-table { width: 100%; border-collapse: collapse; }
+.mission-relics-table td { padding: 10px 15px; border-bottom: 1px solid #1f1f22; font-size: 12px; color: #bbb; }
+.part-badge { display: inline-block; background: rgba(95, 255, 165, 0.08); border: 1px solid rgba(95, 255, 165, 0.2); color: #5fffa5; padding: 2px 6px; border-radius: 3px; font-size: 9px; font-weight: 700; text-transform: uppercase; }
 
-/* Stile tabella integrata per i Base Warframe */
-.base-mission-table {
-    width: 100%; 
-    border-collapse: collapse;
+.btn-toggle-large {
+  width: 100%; padding: 15px; margin-top: 20px;
+  background: var(--gold); color: #000; font-weight: 800; letter-spacing: 1px;
+  border: none; border-radius: 2px; cursor: pointer; text-transform: uppercase;
 }
-.base-mission-table td {
-    padding: 8px 12px;
-    border-bottom: 1px solid #1a1a1e;
-    font-size: 11px;
+.btn-toggle-large.owned { background: #222; color: #fff; border: 1px solid #444; }
+.wiki-btn-block { 
+  display: block; width: 100%; margin-top: 15px; padding: 10px;
+  background: transparent; text-align: center; font-size: 11px; font-weight: 800; 
+  color: #666; border: 1px solid #333; text-transform: uppercase; text-decoration: none; 
 }
-.base-mission-table tr:last-child td {
-    border-bottom: none;
+.vault-badge { font-size: 10px; padding: 4px 10px; border-radius: 2px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+.vault-badge.is-vaulted { background: rgba(255, 50, 50, 0.1); color: #ff5555; border: 1px solid rgba(255, 50, 50, 0.3); }
+.vault-badge.is-available { background: rgba(50, 255, 100, 0.05); color: #5fffa5; border: 1px solid rgba(50, 255, 100, 0.2); }
+.base-mission-table { width: 100%; border-collapse: collapse; }
+.base-mission-table td { padding: 8px 12px; border-bottom: 1px solid #1a1a1e; font-size: 11px; }
+
+/* =========================================
+   MEDIA QUERIES - MOBILE TRANSFORMATION
+   ========================================= */
+
+@media (max-width: 1024px) {
+  .modal-overlay {
+    padding: 0;
+    align-items: flex-start; /* Allinea in alto */
+    overflow-y: auto; /* Permette lo scroll dell'overlay */
+  }
+
+  .modal-content-simple {
+    width: 100%;
+    min-height: 100vh; /* Occupa tutto lo schermo */
+    height: auto;
+    max-height: none;
+    border: none;
+    border-radius: 0;
+    flex-direction: column; /* COLONNA VERTICALE */
+    box-shadow: none;
+    overflow: visible; /* Lascia che il contenuto allunghi la pagina */
+  }
+  
+  .modal-body {
+    flex-direction: column;
+    height: auto;
+    overflow: visible;
+  }
+
+  .close-btn {
+    top: 15px; right: 15px;
+    background: #000; border: 1px solid var(--gold);
+    color: var(--gold);
+    position: fixed; /* FISSO SULLO SCHERMO */
+  }
+
+  /* Reset delle colonne per Mobile */
+  .col-left, .col-center, .col-right {
+    flex: none; 
+    width: 100%;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid #333;
+    padding: 20px;
+    overflow: visible;
+  }
+  
+  .col-left { order: 1; background: #050505; padding-top: 60px; /* Spazio per il bottone di chiusura */ }
+  .col-center { order: 2; background: #121214; }
+  .col-right { order: 3; background: #0e0e10; padding-bottom: 100px; }
+
+  /* Aggiustamenti Immagine Mobile */
+  .det-img-box {
+    height: 300px; /* Altezza fissa ma contenuta */
+    margin-top: 10px;
+  }
+  .det-title { font-size: 28px; }
+
+  /* Nascondi colonna destra se in base mode */
+  .modal-content-simple.base-mode .col-right { display: none; }
 }
 
 ==================================================
