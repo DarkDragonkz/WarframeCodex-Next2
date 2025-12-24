@@ -1,40 +1,49 @@
 // src/utils/clientCategories.js
 
+// Funzione helper per identificare rigorosamente un Necramech
+const isNecramech = (item) => {
+    const type = (item.type || "").toLowerCase();
+    const name = item.name.toLowerCase();
+    
+    // Controlla se il tipo contiene "necramech"
+    if (type.includes('necramech')) return true;
+    
+    // Controlla i nomi specifici (perché Bonewidow e Voidrig a volte hanno tipo generico)
+    if (name === 'bonewidow' || name === 'voidrig') return true;
+    
+    return false;
+};
+
 export const CATEGORY_CONFIGS = {
     'warframes': [
         {
             id: 'all', label: 'ALL',
             filter: (item) => {
                 const type = (item.type || "").toLowerCase();
-                const name = item.name.toLowerCase();
+                // Deve essere Warframe E NON Necramech
                 return type.includes('warframe') && 
                        item.category === 'Warframes' &&
-                       !name.includes('necramech') &&
-                       !type.includes('necramech');
+                       !isNecramech(item);
             }
         },
         {
             id: 'base', label: 'BASE',
             filter: (item) => {
                 const type = (item.type || "").toLowerCase();
-                const name = item.name.toLowerCase();
                 return type.includes('warframe') && 
                        item.category === 'Warframes' && 
                        !item.name.includes('Prime') &&
-                       !name.includes('necramech') &&
-                       !type.includes('necramech');
+                       !isNecramech(item);
             }
         },
         {
             id: 'prime', label: 'PRIME',
             filter: (item) => {
                 const type = (item.type || "").toLowerCase();
-                const name = item.name.toLowerCase();
                 return type.includes('warframe') && 
                        item.category === 'Warframes' && 
                        item.name.includes('Prime') &&
-                       !name.includes('necramech') &&
-                       !type.includes('necramech');
+                       !isNecramech(item);
             }
         }
     ],
@@ -101,9 +110,8 @@ export const CATEGORY_CONFIGS = {
         }
     ],
     'necramechs': [
-         { id: 'all', label: 'NECRAMECHS', filter: (item) => (item.type || "").toLowerCase().includes('necramech') }
+         { id: 'all', label: 'NECRAMECHS', filter: (item) => isNecramech(item) }
     ],
-    // NUOVA CATEGORIA AGGIUNTA
     'amps': [
         {
             id: 'all',
