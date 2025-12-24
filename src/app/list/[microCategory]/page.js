@@ -1,11 +1,24 @@
 import { notFound } from 'next/navigation';
-import { getMicroCategory } from '@/utils/categoryConfig';
+import { getMicroCategory, HIERARCHY } from '@/utils/categoryConfig'; // Importa HIERARCHY
 import { fetchGameData } from '@/utils/serverData';
 
 // Importiamo i componenti Client
 import CodexListPage from '@/components/CodexListPage';
 import ModsClientPage from '@/app/mods/ModsClientPage';
 import RelicsClientPage from '@/app/relics/RelicsClientPage';
+
+// QUESTA FUNZIONE DICE A NEXT.JS QUALI PAGINE COSTRUIRE
+export async function generateStaticParams() {
+    const params = [];
+    // Cicla tutte le macro categorie
+    HIERARCHY.forEach(macro => {
+        // Cicla tutte le micro categorie dentro ogni macro
+        macro.items.forEach(micro => {
+            params.push({ microCategory: micro.id });
+        });
+    });
+    return params;
+}
 
 export default async function DynamicListPage({ params }) {
     const resolvedParams = await params;
@@ -16,15 +29,13 @@ export default async function DynamicListPage({ params }) {
     // 1. Carica i dati
     let data = await fetchGameData(microCat.json);
     
-    // 2. Filtra i dati lato server se necessario (Ottimizzazione)
+    // 2. Filtra i dati lato server se necessario
     if (microCat.filter) {
         data = data.filter(microCat.filter);
     }
 
     // 3. Gestione Casi Speciali (Mods, Relics)
     if (microCat.specialPage === 'mods') {
-        // Per le mod, potremmo aver bisogno anche di Arcanes se la categoria è mista, 
-        // ma qui abbiamo diviso i JSON, quindi carichiamo solo quello giusto.
         return <ModsClientPage initialData={data} />;
     }
 
@@ -32,21 +43,23 @@ export default async function DynamicListPage({ params }) {
         return <RelicsClientPage initialData={data} />;
     }
 
-    // 4. Default: Pagina Lista Standard (Warframe, Armi, ecc.)
-    // Carichiamo anche lookup per i Warframe (per sapere se sono vaulted)
+    // 4. Default: Pagina Lista Standard
     let lookup = null;
-    if (microCat.id === 'warframes' || microCat.id === 'primary' || microCat.id === 'secondary' || microCat.id === 'melee') {
+    if (['warframes', 'primary', 'secondary', 'melee', 'companions'].includes(microCat.id)) {
         lookup = await fetchGameData('RelicLookup.json');
     }
+
+    // Determina se attivare i TAB Base/Prime
+    const categoryMode = ['warframes', 'primary', 'secondary', 'melee', 'companions'].includes(microCat.id) 
+        ? microCat.id 
+        : null;
 
     return (
         <CodexListPage 
             initialData={data} 
             lookupData={lookup}
             pageTitle={microCat.title} 
-            // Passiamo un ID categoria generico se serve per logiche interne, 
-            // ma ora il filtraggio è già fatto lato server!
-            categoryMode={null} 
+            categoryMode={categoryMode} 
         />
     );
 }
