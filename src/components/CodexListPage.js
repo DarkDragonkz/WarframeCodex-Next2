@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import Link from 'next/link'; // <--- QUESTO È FONDAMENTALE
+import Link from 'next/link';
 import CodexCard from './CodexCard';
 import dynamic from 'next/dynamic';
 import { useOwnedItems } from '@/hooks/useOwnedItems';
@@ -33,7 +33,7 @@ function CodexContent({ pageTitle, categoryMode, initialData = [], lookupData = 
     const [searchTerm, setSearchTerm] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
 
-    // NUOVO FILTRO 3 STATI
+    // FILTRO 3 STATI (ALL -> MISSING -> OWNED)
     const [filterState, setFilterState] = useState('all');
     const [showVaulted, setShowVaulted] = useState(false);
 
@@ -46,7 +46,7 @@ function CodexContent({ pageTitle, categoryMode, initialData = [], lookupData = 
         return () => clearTimeout(timer);
     }, [searchTerm]);
 
-    // Ciclo Stati Filtro: ALL -> MISSING -> OWNED -> ALL
+    // Ciclo Stati Filtro
     const cycleFilterState = () => {
         if (filterState === 'all') setFilterState('missing');
         else if (filterState === 'missing') setFilterState('owned');
@@ -103,8 +103,8 @@ function CodexContent({ pageTitle, categoryMode, initialData = [], lookupData = 
             
             // LOGICA 3 STATI
             const isOwned = ownedCards.has(item.uniqueName);
-            if (filterState === 'missing' && isOwned) return false;
-            if (filterState === 'owned' && !isOwned) return false;
+            if (filterState === 'missing' && isOwned) return false; // Mostra solo mancanti
+            if (filterState === 'owned' && !isOwned) return false;  // Mostra solo posseduti
 
             if (!showVaulted && item.vaulted) return false;
             
@@ -175,13 +175,14 @@ function CodexContent({ pageTitle, categoryMode, initialData = [], lookupData = 
                             <input type="text" className="search-input" placeholder="SEARCH..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value.toLowerCase())} />
                         </div>
                         
+                        {/* CHECKBOX SHOW VAULTED (Mantenuta) */}
                         <label className="toggle-filter">
                             <input type="checkbox" style={{display:'none'}} checked={showVaulted} onChange={(e) => setShowVaulted(e.target.checked)} />
                             <div className="checkbox-custom">{showVaulted && '✓'}</div>
                             SHOW VAULTED
                         </label>
 
-                        {/* BOTTONE CICLICO */}
+                        {/* BOTTONE CICLICO CON TESTO (Sostituisce la vecchia checkbox "Missing") */}
                         <button 
                             className={`cycle-btn state-${filterState}`} 
                             onClick={cycleFilterState}

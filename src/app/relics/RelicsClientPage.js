@@ -19,7 +19,7 @@ export default function RelicsClientPage({ initialData = [] }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     
-    // NUOVO FILTRO 3 STATI
+    // FILTRO 3 STATI
     const [filterState, setFilterState] = useState('all');
     
     const [showVaulted, setShowVaulted] = useState(false);
@@ -143,13 +143,14 @@ export default function RelicsClientPage({ initialData = [] }) {
                             />
                         </div>
                         
+                        {/* CHECKBOX SHOW VAULTED (Mantenuta) */}
                         <label className="toggle-filter">
                             <input type="checkbox" style={{display:'none'}} checked={showVaulted} onChange={(e) => setShowVaulted(e.target.checked)} />
                             <div className="checkbox-custom">{showVaulted && '✓'}</div>
                             SHOW VAULTED
                         </label>
 
-                        {/* NUOVO BOTTONE CICLICO */}
+                        {/* BOTTONE CICLICO CON TESTO (Sostituisce la vecchia checkbox "Missing") */}
                         <button 
                             className={`cycle-btn state-${filterState}`} 
                             onClick={cycleFilterState}
