@@ -3,19 +3,22 @@ import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import CodexCard from './CodexCard';
-// Import Dinamico per il Modale (Code Splitting)
 import dynamic from 'next/dynamic';
 import { useOwnedItems } from '@/hooks/useOwnedItems';
+import { CATEGORY_CONFIGS } from '@/utils/clientCategories'; // IMPORTA LE CATEGORIE QUI
 import '@/app/hud-layout.css'; 
 
-// Carica il modale solo quando richiesto dal browser
 const WarframeDetailModal = dynamic(() => import('./WarframeDetailModal'), {
     loading: () => <div style={{position:'fixed', inset:0, zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)', color:'white'}}>Loading Interface...</div>,
-    ssr: false // Il modale non serve lato server
+    ssr: false
 });
 
-function CodexContent({ pageTitle, customCategories = null, initialData = [], lookupData = null }) {
-    // initialData viene ora passato dal Server Component
+function CodexContent({ pageTitle, categoryMode, initialData = [], lookupData = null }) {
+    // categoryMode è una stringa (es: "warframes", "primary")
+    
+    // Recupera la configurazione corretta dal file client
+    const customCategories = categoryMode ? CATEGORY_CONFIGS[categoryMode] : null;
+
     const [rawApiData, setRawApiData] = useState([]);
     const [loading, setLoading] = useState(true);
     
@@ -29,7 +32,6 @@ function CodexContent({ pageTitle, customCategories = null, initialData = [], lo
     const subCategory = searchParams.get('sub') || defaultCat;
     const [activeSubFilter, setActiveSubFilter] = useState('all');
     
-    // Gestione Ricerca con Debounce
     const [searchTerm, setSearchTerm] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
 
@@ -39,17 +41,16 @@ function CodexContent({ pageTitle, customCategories = null, initialData = [], lo
 
     const activeConfig = customCategories ? customCategories.find(c => c.id === subCategory) : null;
 
-    // Effetto Debounce per la ricerca
     useEffect(() => {
         const timer = setTimeout(() => {
             setDebouncedSearch(searchTerm);
-        }, 300); // Ritardo di 300ms
+        }, 300);
         return () => clearTimeout(timer);
     }, [searchTerm]);
 
-    // Processamento Iniziale Dati (Eseguito una sola volta all'avvio)
+    // Processamento Iniziale Dati
     useEffect(() => {
-        if (initialData && initialData.length > 0) {
+        if (initialData) {
             const activeRelicsSet = new Set(lookupData ? Object.keys(lookupData) : []);
             
             const processed = initialData
@@ -57,7 +58,6 @@ function CodexContent({ pageTitle, customCategories = null, initialData = [], lo
                 .map(item => {
                     let computedVaulted = !!item.vaulted; 
 
-                    // Logica calcolo Vaulted per i Prime basata sul Lookup passato dal server
                     if (item.name.includes('Prime') && lookupData) {
                         const relicNames = [];
                         if (item.components) {
@@ -85,7 +85,6 @@ function CodexContent({ pageTitle, customCategories = null, initialData = [], lo
                     };
                 });
 
-            // Rimuovi duplicati e ordina
             const uniqueItems = Array.from(new Map(processed.map(item => [item.name, item])).values());
             uniqueItems.sort((a, b) => a.name.localeCompare(b.name));
             
@@ -96,7 +95,6 @@ function CodexContent({ pageTitle, customCategories = null, initialData = [], lo
 
     const processedData = useMemo(() => {
         return rawApiData.filter(item => {
-            // Usa debouncedSearch invece di searchTerm diretto
             if (debouncedSearch && !item.name.toLowerCase().includes(debouncedSearch)) return false;
             if (showMissingOnly && ownedCards.has(item.uniqueName)) return false;
             if (hideVaulted && item.vaulted) return false;
@@ -165,13 +163,7 @@ function CodexContent({ pageTitle, customCategories = null, initialData = [], lo
                     
                     <div className="filters-right">
                          <div className="search-wrapper">
-                            <input 
-                                type="text" 
-                                className="search-input" 
-                                placeholder="SEARCH..." 
-                                value={searchTerm} 
-                                onChange={(e) => setSearchTerm(e.target.value.toLowerCase())} 
-                            />
+                            <input type="text" className="search-input" placeholder="SEARCH..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value.toLowerCase())} />
                         </div>
                         <label className="toggle-filter">
                             <input type="checkbox" style={{display:'none'}} checked={hideVaulted} onChange={(e) => setHideVaulted(e.target.checked)} />
@@ -199,7 +191,6 @@ function CodexContent({ pageTitle, customCategories = null, initialData = [], lo
                     ))}
                 </div>
             </div>
-            
             {selectedItem && (
                 <WarframeDetailModal item={selectedItem} onClose={() => setSelectedItem(null)} ownedItems={ownedCards} onToggle={toggleOwned} />
             )}

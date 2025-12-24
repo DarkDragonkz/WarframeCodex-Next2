@@ -1,7 +1,14 @@
-import CodexListPage from '@/components/CodexListPage';
 import { fetchGameData } from '@/utils/serverData';
+import CodexListPage from '@/components/CodexListPage';
 
 export default async function Page() {
-    const data = await fetchGameData('Warframes.json'); // I mech sono qui dentro
-    return <CodexListPage initialData={data} pageTitle="NECRAMECHS" categoryMode="necramechs" />;
+    const data = await fetchGameData('Warframes.json');
+
+    return (
+        <CodexListPage 
+            initialData={data} 
+            pageTitle="NECRAMECHS" 
+            categoryMode="necramechs"
+        />
+    );
 }

@@ -1,62 +1,44 @@
-// src/utils/serverData.js
 import fs from 'fs/promises';
 import path from 'path';
 import { API_BASE_URL } from './constants';
 
-const DB_FOLDER = path.join(process.cwd(), 'database_api');
+// Determina la cartella del database in modo sicuro
+// process.cwd() è la root del progetto durante la build
+const DB_FOLDER = path.join(process.cwd(), 'public', 'database_api'); 
+// NOTA: Ho aggiunto 'public'. Se la tua cartella 'database_api' è nella root (fuori da public), togli 'public'.
+// Ma per Next.js, i file statici accessibili via fetch dovrebbero stare in /public/database_api.
+// SE LA CARTELLA è nella root del progetto (allo stesso livello di src), usa:
+// const DB_FOLDER = path.join(process.cwd(), 'database_api');
 
-// CACHE GLOBALE IN MEMORIA (Singleton pattern)
+// Cache globale per evitare riletture durante la build
 global.dataCache = global.dataCache || {};
 
-export async function fetchGameData(filename, forceRefresh = false) {
-    const filePath = path.join(DB_FOLDER, filename);
-
-    // 1. CONTROLLO CACHE RAM (Velocità Massima)
-    if (!forceRefresh && global.dataCache[filename]) {
+export async function fetchGameData(filename) {
+    // 1. Controlla Cache RAM
+    if (global.dataCache[filename]) {
         return global.dataCache[filename];
     }
 
-    // 2. CONTROLLO LOCALE SU DISCO
-    if (!forceRefresh) {
+    // 2. Tenta lettura da File System (Obbligatorio per la Build)
+    // Cerchiamo sia in root/database_api che in root/public/database_api per sicurezza
+    const possiblePaths = [
+        path.join(process.cwd(), 'database_api', filename),
+        path.join(process.cwd(), 'public', 'database_api', filename)
+    ];
+
+    for (const filePath of possiblePaths) {
         try {
             const fileContent = await fs.readFile(filePath, 'utf-8');
             const json = JSON.parse(fileContent);
-            if (Array.isArray(json) && json.length > 0) {
-                // Salva in RAM per la prossima volta
-                global.dataCache[filename] = json;
-                return json;
-            }
-        } catch (error) {
-            // File mancante o corrotto, procedi al download
+            global.dataCache[filename] = json;
+            return json;
+        } catch (e) {
+            // Continua al prossimo path
         }
     }
 
-    // 3. DOWNLOAD DA GITHUB
-    try {
-        console.log(`[SERVER] Downloading ${filename}...`);
-        const url = `${API_BASE_URL}/${filename}`;
-        const res = await fetch(url, { cache: 'no-store' }); // No fetch cache
-        if (!res.ok) throw new Error(`HTTP Error ${res.status}: ${url}`);
-        
-        const data = await res.json();
-
-        // 4. SALVATAGGIO DISCO + RAM
-        try {
-            await fs.mkdir(DB_FOLDER, { recursive: true });
-            await fs.writeFile(filePath, JSON.stringify(data, null, 2));
-            global.dataCache[filename] = data; // Aggiorna RAM
-            console.log(`[SERVER] Saved: ${filePath}`);
-        } catch (writeErr) {
-            console.error(`[SERVER] Disk write error:`, writeErr);
-        }
-
-        return data;
-    } catch (error) {
-        console.error(`[SERVER ERROR] Failed to load ${filename}:`, error);
-        return [];
-    }
-}
-
-export async function fetchRelicsDB() {
-    return await fetchGameData('Relics.json');
+    // 3. Se fallisce FS, evita fetch durante la build statica
+    // Restituisci array vuoto per non rompere la build
+    console.warn(`[SERVER WARNING] Could not load ${filename} from FS. Returning empty array.`);
+    return [];
 }
