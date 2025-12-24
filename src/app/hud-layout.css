@@ -144,3 +144,97 @@
   content-visibility: auto;
   contain-intrinsic-size: 400px; /* Altezza stimata della card */
 }
+/* ... contenuto esistente ... */
+
+/* =========================================
+   MEDIA QUERIES PER MOBILE (HUD)
+   ========================================= */
+
+@media (max-width: 768px) {
+  /* Rimuove overflow: hidden per permettere lo scroll della pagina intera se serve,
+     anche se qui manteniamo la logica dello scroll interno */
+  .codex-layout {
+    height: 100dvh; /* Usa dynamic viewport height per mobile browser moderni */
+  }
+
+  /* Header: Riduciamo altezza e padding */
+  .nav-top-row {
+    padding: 0 15px;
+    height: 60px;
+  }
+
+  .nav-brand {
+    gap: 15px;
+  }
+
+  .page-title {
+    font-size: 20px; /* Titolo più piccolo */
+    padding-left: 10px;
+  }
+  
+  /* Nascondiamo le statistiche complete su mobile se non c'è spazio, 
+     oppure le riduciamo */
+  .stats-right {
+    gap: 10px;
+  }
+  .stat-box {
+    display: flex; flex-direction: column; align-items: flex-end;
+  }
+  .stat-label { font-size: 7px; }
+  .stat-value { font-size: 14px; }
+
+  /* Controlli (Filtri e Ricerca): Impilamento Verticale */
+  .controls-row {
+    flex-direction: column;
+    align-items: stretch; /* Allarga tutto a larghezza piena */
+    gap: 15px;
+    padding: 15px;
+    height: auto; /* Lascia che l'altezza si adatti */
+  }
+
+  /* I tab delle categorie devono essere scrollabili orizzontalmente */
+  .filters-left {
+    max-width: 100% !important;
+    overflow-x: auto;
+    padding-bottom: 5px; /* Spazio per scrollbar */
+  }
+  
+  .filters-right {
+    flex-direction: column; /* Impila input ricerca e checkbox */
+    gap: 10px;
+    width: 100%;
+  }
+
+  .search-wrapper, .search-input {
+    width: 100%; /* Barra di ricerca a larghezza piena */
+  }
+
+  .legend-box {
+    display: none; /* Nascondi la legenda su mobile per risparmiare spazio */
+  }
+
+  .toggle-filter {
+    width: 100%;
+    justify-content: flex-start; /* Allinea checkbox a sinistra */
+    padding: 5px 0;
+  }
+
+  /* Griglia Cards */
+  .gallery-scroll-area {
+    padding: 15px; /* Meno padding laterale */
+  }
+  
+  .card-gallery {
+    /* Riduciamo la dimensione minima delle card per farne stare 2 su schermi piccoli */
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 15px;
+  }
+
+  /* Adattamento Card */
+  .card-wrapper {
+    height: 320px !important; /* Card leggermente più basse */
+  }
+  .card-image-container {
+    height: 140px;
+  }
+}
